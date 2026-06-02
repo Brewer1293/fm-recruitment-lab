@@ -9,7 +9,9 @@ const row = (player: ScoredPlayer, score?: RoleScore) => [...columns.map((key) =
 const headers = [...columns, "roleScore", "recruitmentScore", "confidenceScore", "attributeScore", "adjustedStatsScore", "hiddenProfileScore", "positionScore", "valueScore", "caps", "warnings", "strengths", "concerns"];
 
 export function exportCSV(name: string, players: ScoredPlayer[], scores?: Map<string, RoleScore>) {
-  download(name, [headers, ...players.map((player) => row(player, scores?.get(player.id)))].map((values) => values.map(quote).join(",")).join("\n"), "text/csv;charset=utf-8");
+  const lines = [headers.map(quote).join(",")];
+  for (const player of players) lines.push(row(player, scores?.get(player.id)).map(quote).join(","));
+  download(name, lines.join("\n"), "text/csv;charset=utf-8");
 }
 export function exportHTML(name: string, players: ScoredPlayer[], scores: Map<string, RoleScore>) {
   const body = players.map((player) => `<tr>${row(player, scores.get(player.id)).map((value) => `<td>${String(value ?? "")}</td>`).join("")}</tr>`).join("");

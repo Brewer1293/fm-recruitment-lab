@@ -137,7 +137,8 @@ export async function importFMFiles(files: File[], onProgress: (message: string,
     if (!/\.html?$/i.test(file.name)) throw new Error(`${file.name}: upload an FM HTML export.`);
     names.push(file.name);
     const parsed = await parseHTML(file, (percent) => onProgress(`Reading ${file.name}`, Math.round(((index + percent / 100) / files.length) * 100)));
-    parsed.headers.forEach((header) => allHeaders.add(header)); allRows.push(...parsed.rows);
+    parsed.headers.forEach((header) => allHeaders.add(header));
+    for (const row of parsed.rows) allRows.push(row);
   }
   const headers = [...allHeaders], columns = mapColumns(headers);
   const missingRequired = REQUIRED.filter((key) => !columns[key]);
