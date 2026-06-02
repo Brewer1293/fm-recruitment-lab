@@ -2,8 +2,8 @@ import "./globals.css";
 import type { ReactNode } from "react";
 
 export const metadata = {
-  title: "Miracle One Recruitment Lab",
-  description: "Private in-browser FM24 tactic recruitment scoring.",
+  title: "FM Recruitment Lab",
+  description: "Private in-browser FM24 recruitment scoring from uploaded HTML exports.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

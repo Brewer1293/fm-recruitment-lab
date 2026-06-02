@@ -7,6 +7,7 @@ const ALIASES: Record<string, string[]> = {
   height: ["height"], valueM: ["transfer value", "value"], wageK: ["wage"], minutes: ["mins", "minutes"],
   averageRating: ["av rat", "average rating"], uid: ["uid"],
   acc: ["acc"], pac: ["pac"], sta: ["sta"], wor: ["wor"], cro: ["cro"], dri: ["dri", "drb"],
+  nat: ["nat", "natural fitness"],
   otb: ["otb", "off the ball"], tck: ["tck"], mar: ["mar"], pos: ["pos"], ant: ["ant"], cnt: ["cnt"],
   dec: ["dec"], fir: ["fir"], pas: ["pas"], tec: ["tec"], vis: ["vis"], cmp: ["cmp", "com"],
   fla: ["fla"], fin: ["fin"], lon: ["lon"], agi: ["agi"], bal: ["bal"], str: ["str"], jum: ["jum"],
@@ -16,9 +17,10 @@ const ALIASES: Record<string, string[]> = {
   goals90: ["gls/90", "goals/90"], xg90: ["xg/90"], assists90: ["asts/90", "ast/90", "assists/90"],
   xa90: ["xa/90"], keyPasses90: ["k ps/90", "key passes/90"], shots90: ["shot/90", "shots/90"],
   passCompletion: ["pas %", "pass %"], tackles90: ["tck/90", "tackles/90"], interceptions90: ["int/90", "interceptions/90"],
-  headersWon90: ["hdrs w/90", "headers won/90"], crossesCompleted90: ["cr c/90", "crosses completed/90"],
+  headersWon90: ["hdrs w/90", "headers won/90"], headersPct: ["hdr %", "headers %"], crossesCompleted90: ["cr c/90", "crosses completed/90"],
   dribbles90: ["drb/90", "dribbles/90"], savePercentage: ["sv %", "save %"], cleanSheets90: ["cln/90", "clean sheets/90"],
   conceded90: ["con/90", "goals conceded/90"], conversionPercentage: ["conv %", "conversion %"], progressivePasses90: ["pr passes/90", "progressive passes/90"],
+  longPassCompletion: ["long pass %", "long passes %"], errorsLeadingToGoal90: ["errors/90", "err/90", "errors leading to goal/90"],
 };
 const NUMERIC = new Set(Object.keys(ALIASES).filter((key) => !["name", "club", "nationality", "position", "personality", "mediaHandling", "preferredFoot", "leftFoot", "rightFoot", "height", "uid"].includes(key)));
 const REQUIRED = ["name", "position"];
@@ -32,11 +34,16 @@ const number = (value?: string) => {
   return match ? Number(match[0]) : undefined;
 };
 const money = (value?: string) => {
-  if (!value) return undefined;
-  const match = value.replace(/,/g, "").match(/(\d+(?:\.\d+)?)\s*([km]?)/i);
-  if (!match) return undefined;
-  const amount = Number(match[1]), suffix = match[2].toLowerCase();
-  return suffix === "m" ? amount : suffix === "k" ? amount / 1000 : amount > 1000 ? amount / 1_000_000 : amount;
+  if (!value) return { low: undefined, high: undefined, mid: undefined, status: "missing" as const };
+  const cleaned = value.replace(/,/g, "").replace(/£/g, "").trim();
+  if (/not for sale/i.test(cleaned) || /^nfs$/i.test(cleaned)) return { low: undefined, high: undefined, mid: undefined, status: "not_for_sale" as const };
+  const values = [...cleaned.matchAll(/(\d+(?:\.\d+)?)\s*([km]?)/gi)].map((match) => {
+    const amount = Number(match[1]), suffix = match[2].toLowerCase();
+    return suffix === "m" ? amount : suffix === "k" ? amount / 1000 : amount > 1000 ? amount / 1_000_000 : amount;
+  });
+  if (!values.length) return { low: undefined, high: undefined, mid: undefined, status: "missing" as const };
+  const low = Math.min(...values), high = Math.max(...values);
+  return { low, high, mid: (low + high) / 2, status: low === high ? "fixed" as const : "range" as const };
 };
 const wage = (value?: string) => {
   if (!value) return undefined;
@@ -90,9 +97,17 @@ async function parseHTML(file: File, onProgress: (percent: number) => void) {
 }
 
 function mapColumns(headers: string[]) {
-  const normalized = new Map<string, string>();
-  headers.forEach((header) => { if (!normalized.has(norm(header))) normalized.set(norm(header), header); });
-  return Object.fromEntries(Object.entries(ALIASES).map(([key, aliases]) => [key, aliases.map((alias) => normalized.get(alias)).find(Boolean)])) as Record<string, string | undefined>;
+  const normalized = new Map<string, string[]>();
+  headers.forEach((header) => normalized.set(norm(header), [...(normalized.get(norm(header)) ?? []), header]));
+  return Object.fromEntries(Object.entries(ALIASES).map(([key, aliases]) => {
+    for (const alias of aliases) {
+      const matches = normalized.get(alias);
+      if (!matches?.length) continue;
+      if (key === "nat" && alias === "nat" && matches.length > 1) return [key, matches[1]];
+      return [key, matches[0]];
+    }
+    return [key, undefined];
+  })) as Record<string, string | undefined>;
 }
 
 function normalize(rows: RawPlayer[], columns: Record<string, string | undefined>) {
@@ -103,7 +118,11 @@ function normalize(rows: RawPlayer[], columns: Record<string, string | undefined
       const value = raw[header];
       player[key] = NUMERIC.has(key) ? number(value) : value;
     });
-    player.valueM = money(raw[columns.valueM ?? ""]);
+    const parsedValue = money(raw[columns.valueM ?? ""]);
+    player.valueLowM = parsedValue.low;
+    player.valueHighM = parsedValue.high;
+    player.valueM = parsedValue.mid;
+    player.transferValueStatus = parsedValue.status;
     player.wageK = wage(raw[columns.wageK ?? ""]);
     const average = (a: string, b: string) => typeof player[a] === "number" && typeof player[b] === "number" ? ((player[a] as number) + (player[b] as number)) / 2 : undefined;
     player.spd = average("pac", "acc"); player.work = average("wor", "sta"); player.setP = average("jum", "bra");

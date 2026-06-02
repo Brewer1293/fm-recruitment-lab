@@ -1,7 +1,7 @@
 /** @type {import("next").NextConfig} */
 const nextConfig = {
   output: "export",
-  basePath: "/fm-recruitment",
+  basePath: process.env.NEXT_PUBLIC_BASE_PATH || "",
   outputFileTracingRoot: process.cwd(),
 };
 
