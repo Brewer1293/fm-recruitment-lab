@@ -1,0 +1,102 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { exportCSV, exportHTML } from "../lib/exports";
+import { importFMFiles } from "../lib/fmParser";
+import { ROLE_CONFIG, TACTIC_SLOTS } from "../lib/roleConfig";
+import { scoreForSlot, scorePlayers } from "../lib/scoring";
+import type { RoleId, RoleScore, ScoredPlayer, SlotId, ValidationReport } from "../lib/types";
+
+type Tab = "tactic" | "rankings" | "import" | "validation" | "compare" | "settings";
+const fmt = (value?: number, dp = 1) => value === undefined ? "-" : value.toFixed(dp);
+const scoreClass = (value?: number) => value === undefined ? "" : value >= 80 ? "elite" : value >= 65 ? "good" : value >= 50 ? "okay" : "low";
+
+export default function Home() {
+  const [tab, setTab] = useState<Tab>("import"), [players, setPlayers] = useState<ScoredPlayer[]>([]);
+  const [report, setReport] = useState<ValidationReport | null>(null), [error, setError] = useState("");
+  const [progress, setProgress] = useState({ message: "", percent: 0 }), [busy, setBusy] = useState(false);
+  const [roleId, setRoleId] = useState<RoleId>("af-at"), [slot, setSlot] = useState<SlotId>("ST");
+  const [selected, setSelected] = useState<ScoredPlayer | null>(null), [compareIds, setCompareIds] = useState<string[]>([]);
+  const [search, setSearch] = useState(""), [minMinutes, setMinMinutes] = useState(0), [maxAge, setMaxAge] = useState(50);
+  const [minAge, setMinAge] = useState(0), [club, setClub] = useState(""), [nation, setNation] = useState(""), [positionFilter, setPositionFilter] = useState(""), [foot, setFoot] = useState("");
+  const [maxWage, setMaxWage] = useState(1000), [maxValue, setMaxValue] = useState(500), [minScore, setMinScore] = useState(0);
+  const [includeMissingStats, setIncludeMissingStats] = useState(true), [includeMissingHidden, setIncludeMissingHidden] = useState(true);
+  const [sortKey, setSortKey] = useState("total"), [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+
+  const rankingScores = useMemo(() => new Map(players.map((player) => [player.id, scoreForSlot(player, roleId, slot)])), [players, roleId, slot]);
+  const rankings = useMemo(() => players.filter((player) => {
+    const score = rankingScores.get(player.id)!;
+    return `${player.name} ${player.club ?? ""}`.toLowerCase().includes(search.toLowerCase()) &&
+      Number(player.minutes ?? 0) >= minMinutes && Number(player.age ?? 0) >= minAge && Number(player.age ?? 0) <= maxAge &&
+      String(player.club ?? "").toLowerCase().includes(club.toLowerCase()) && String(player.nationality ?? "").toLowerCase().includes(nation.toLowerCase()) &&
+      String(player.position ?? "").toLowerCase().includes(positionFilter.toLowerCase()) && `${player.preferredFoot ?? ""} ${player.leftFoot ?? ""} ${player.rightFoot ?? ""}`.toLowerCase().includes(foot.toLowerCase()) &&
+      Number(player.wageK ?? 0) <= maxWage && Number(player.valueM ?? 0) <= maxValue && score.total >= minScore &&
+      (includeMissingStats || score.stats.available > 0) && (includeMissingHidden || score.hidden.available > 0);
+  }).sort((a, b) => {
+    const aScore = rankingScores.get(a.id)!, bScore = rankingScores.get(b.id)!;
+    const part = (score: RoleScore) => sortKey === "positionScore" ? score.position.score : ["attribute", "stats", "hidden", "value"].includes(sortKey) ? score[sortKey as "attribute" | "stats" | "hidden" | "value"].score : score.total;
+    const aValue = ["total", "attribute", "stats", "hidden", "positionScore", "value"].includes(sortKey) ? Number(part(aScore) ?? 0) : String(a[sortKey] ?? "");
+    const bValue = ["total", "attribute", "stats", "hidden", "positionScore", "value"].includes(sortKey) ? Number(part(bScore) ?? 0) : String(b[sortKey] ?? "");
+    const result = typeof aValue === "number" && typeof bValue === "number" ? aValue - bValue : String(aValue).localeCompare(String(bValue));
+    return sortDirection === "asc" ? result : -result;
+  }), [players, rankingScores, search, minMinutes, minAge, maxAge, club, nation, positionFilter, foot, maxWage, maxValue, minScore, includeMissingStats, includeMissingHidden, sortKey, sortDirection]);
+  const compared = players.filter((player) => compareIds.includes(player.id));
+
+  async function handleFiles(files: File[]) {
+    setBusy(true); setError(""); setProgress({ message: "Preparing upload", percent: 0 });
+    try {
+      const imported = await importFMFiles(files, (message, percent) => setProgress({ message, percent }));
+      const scored = scorePlayers(imported.players); setPlayers(scored); setReport(imported.report); setTab("validation");
+    } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
+    finally { setBusy(false); }
+  }
+  function selectSlot(nextSlot: SlotId, nextRole: RoleId) { setSlot(nextSlot); setRoleId(nextRole); setTab("rankings"); }
+  function toggleCompare(id: string) { setCompareIds((current) => current.includes(id) ? current.filter((value) => value !== id) : current.length < 4 ? [...current, id] : current); }
+  function clearData() { setPlayers([]); setReport(null); setCompareIds([]); setSelected(null); setTab("import"); }
+  function sort(next: string) { if (sortKey === next) setSortDirection((value) => value === "desc" ? "asc" : "desc"); else { setSortKey(next); setSortDirection("desc"); } }
+
+  return <main className="shell">
+    <header className="hero"><div><span className="eyebrow">FM24 tactic recruitment</span><h1>Miracle One Recruitment Lab</h1><p>Private browser-side scouting for one 4-2DM-3-1 tactic. Your FM export stays on this device.</p></div><div className="hero-stat"><strong>{players.length.toLocaleString()}</strong><span>players loaded</span></div></header>
+    <nav>{(["tactic", "rankings", "import", "validation", "compare", "settings"] as Tab[]).map((value) => <button key={value} className={tab === value ? "active" : ""} onClick={() => setTab(value)}>{value}{value === "compare" ? ` (${compareIds.length})` : ""}</button>)}{players.length > 0 && <button className="clear" onClick={clearData}>Clear local data</button>}</nav>
+    {error && <div className="notice error">{error}</div>}
+
+    {tab === "import" && <section className="panel import-panel"><span className="eyebrow">Step one</span><h2>Import FM HTML exports</h2><p>Select one or more FM24 player-search HTML exports. Files are streamed and scored in your browser memory. Nothing is uploaded to a server or saved in localStorage.</p>
+      <label className="dropzone"><strong>{busy ? "Reading player data..." : "Choose FM HTML files"}</strong><span>Large 100 MB+ exports are supported. Missing columns are reported clearly.</span><input type="file" accept=".html,.htm,text/html" multiple disabled={busy} onChange={(event) => handleFiles(Array.from(event.target.files ?? []))} /></label>
+      {(busy || progress.percent > 0) && <div className="progress"><div style={{ width: `${progress.percent}%` }} /><span>{progress.message}: {progress.percent}%</span></div>}
+    </section>}
+
+    {tab === "validation" && <Validation report={report} onTactic={() => setTab("tactic")} />}
+    {tab === "tactic" && <Tactic onSelect={selectSlot} />}
+    {tab === "rankings" && <section className="rank-layout"><section className="panel filters"><div><span className="eyebrow">{slot}</span><h2>{ROLE_CONFIG[roleId].shortName} · {ROLE_CONFIG[roleId].label}</h2></div>
+      <div className="filter-grid"><label>Search<input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Player or club" /></label><label>Club<input value={club} onChange={(e) => setClub(e.target.value)} placeholder="Any club" /></label><label>Nation<input value={nation} onChange={(e) => setNation(e.target.value)} placeholder="Any nation" /></label><label>Position<input value={positionFilter} onChange={(e) => setPositionFilter(e.target.value)} placeholder="e.g. ST or DM" /></label><label>Footedness<input value={foot} onChange={(e) => setFoot(e.target.value)} placeholder="left / right / either" /></label><label>Minimum minutes<input type="number" value={minMinutes} onChange={(e) => setMinMinutes(Number(e.target.value))} /></label><label>Minimum age<input type="number" value={minAge} onChange={(e) => setMinAge(Number(e.target.value))} /></label><label>Maximum age<input type="number" value={maxAge} onChange={(e) => setMaxAge(Number(e.target.value))} /></label><label>Maximum wage £k/w<input type="number" value={maxWage} onChange={(e) => setMaxWage(Number(e.target.value))} /></label><label>Maximum value £m<input type="number" value={maxValue} onChange={(e) => setMaxValue(Number(e.target.value))} /></label><label>Minimum score<input type="number" value={minScore} onChange={(e) => setMinScore(Number(e.target.value))} /></label></div>
+      <div className="toggles"><label><input type="checkbox" checked={includeMissingStats} onChange={(e) => setIncludeMissingStats(e.target.checked)} /> Include missing stats</label><label><input type="checkbox" checked={includeMissingHidden} onChange={(e) => setIncludeMissingHidden(e.target.checked)} /> Include missing hidden data</label>
+      <button onClick={() => exportCSV(`${slot}-${roleId}-rankings.csv`, rankings, rankingScores)}>Export CSV</button><button onClick={() => exportHTML(`${slot}-${roleId}-rankings.html`, rankings, rankingScores)}>Export HTML</button></div></section>
+      <RankTable players={rankings.slice(0, 500)} scores={rankingScores} compareIds={compareIds} sort={sort} onOpen={setSelected} onCompare={toggleCompare} /></section>}
+    {tab === "compare" && <Comparison players={compared} onExport={() => exportCSV("miracle-one-comparison.csv", compared)} />}
+    {tab === "settings" && <Settings onExport={() => exportCSV("miracle-one-full-scored-dataset.csv", players)} />}
+    {selected && <PlayerModal player={selected} slot={slot} roleId={roleId} onClose={() => setSelected(null)} />}
+  </main>;
+}
+
+function Validation({ report, onTactic }: { report: ValidationReport | null; onTactic: () => void }) {
+  if (!report) return <section className="panel empty">Import an FM HTML file to generate a validation report.</section>;
+  return <section className="panel validation"><span className="eyebrow">Import complete</span><h2>Data validation report</h2><div className="report-grid">{report.messages.map((message) => <div key={message}><strong>{message}</strong></div>)}</div>
+    <h3>Files</h3><p>{report.files.join(", ")}</p><h3>Missing useful columns</h3><p>{report.missingUseful.length ? report.missingUseful.join(", ") : "None. Excellent export coverage."}</p>
+    <details><summary>Detected columns ({report.detectedColumns.length})</summary><p>{report.detectedColumns.join(", ")}</p></details><button className="primary" onClick={onTactic}>Open tactic board</button></section>;
+}
+function Tactic({ onSelect }: { onSelect: (slot: SlotId, role: RoleId) => void }) {
+  return <section className="panel tactic-wrap"><div><span className="eyebrow">Miracle One</span><h2>4-2DM-3-1 role map</h2><p>Click a position to open its live rankings.</p></div><div className="pitch">{TACTIC_SLOTS.map((item) => <button key={item.id} className="position" style={{ left: `${item.x}%`, top: `${item.y}%` }} onClick={() => onSelect(item.id, item.roleId)}><strong>{item.id}</strong><span>{ROLE_CONFIG[item.roleId].shortName}</span></button>)}</div></section>;
+}
+function RankTable({ players, scores, compareIds, sort, onOpen, onCompare }: { players: ScoredPlayer[]; scores: Map<string, RoleScore>; compareIds: string[]; sort: (key: string) => void; onOpen: (player: ScoredPlayer) => void; onCompare: (id: string) => void }) {
+  const heads: [string, string][] = [["name", "Player"], ["age", "Age"], ["club", "Club"], ["position", "Position"], ["valueM", "Value"], ["wageK", "Wage"], ["total", "Role"], ["attribute", "Attr"], ["stats", "Stats"], ["hidden", "Hidden"], ["positionScore", "Pos"], ["value", "VFM"], ["minutes", "Mins"], ["averageRating", "Av Rat"]];
+  return <section className="panel table-panel"><div className="panel-head"><strong>{players.length.toLocaleString()} ranked matches</strong><span>Showing first 500 results</span></div><div className="table-scroll"><table><thead><tr><th>#</th><th>Compare</th>{heads.map(([key, label]) => <th key={key} onClick={() => sort(key)}>{label}</th>)}<th>Strengths</th><th>Concern</th></tr></thead><tbody>{players.map((player, index) => { const score = scores.get(player.id)!; return <tr key={player.id} onClick={() => onOpen(player)}><td>{index + 1}</td><td><button className={compareIds.includes(player.id) ? "compare active" : "compare"} onClick={(e) => { e.stopPropagation(); onCompare(player.id); }}>+</button></td><td><strong>{player.name}</strong><small>{player.nationality}</small></td><td>{fmt(player.age, 0)}</td><td>{player.club}</td><td>{player.position}</td><td>£{fmt(player.valueM)}m</td><td>£{fmt(player.wageK)}k</td><td className={scoreClass(score.total)}>{fmt(score.total)}</td><td>{fmt(score.attribute.score)}</td><td>{fmt(score.stats.score)}</td><td>{fmt(score.hidden.score)}</td><td>{fmt(score.position.score)}</td><td>{fmt(score.value.score)}</td><td>{fmt(player.minutes, 0)}</td><td>{fmt(player.averageRating, 2)}</td><td>{score.strengths.join(", ")}</td><td>{score.weaknesses[0] ?? score.warnings[0] ?? "-"}</td></tr>; })}</tbody></table></div></section>;
+}
+function Comparison({ players, onExport }: { players: ScoredPlayer[]; onExport: () => void }) {
+  const roles = Object.keys(ROLE_CONFIG) as RoleId[];
+  return <section className="panel compare-panel"><div className="panel-head"><div><span className="eyebrow">Shortlist decision</span><h2>Player comparison</h2></div><button onClick={onExport}>Export CSV</button></div>{!players.length ? <p>Add up to four players from a role ranking table.</p> : <div className="table-scroll"><table><thead><tr><th>Metric</th>{players.map((player) => <th key={player.id}>{player.name}</th>)}</tr></thead><tbody><tr><td>Club</td>{players.map((p) => <td key={p.id}>{p.club}</td>)}</tr><tr><td>Age</td>{players.map((p) => <td key={p.id}>{p.age}</td>)}</tr>{roles.map((role) => <tr key={role}><td>{ROLE_CONFIG[role].shortName}</td>{players.map((p) => <td key={p.id} className={scoreClass(p.scores[role].total)}>{fmt(p.scores[role].total)}</td>)}</tr>)}</tbody></table></div>}</section>;
+}
+function Settings({ onExport }: { onExport: () => void }) { return <section className="panel settings"><span className="eyebrow">Scoring transparency</span><h2>Miracle One role configuration</h2><p>The model is intentionally config-driven. Adjust <code>src/lib/roleConfig.ts</code> to tune weights without rewriting the scoring engine.</p><button onClick={onExport}>Export full scored dataset CSV</button>{Object.values(ROLE_CONFIG).map((role) => <details key={role.id}><summary><strong>{role.shortName}</strong> · {role.label}</summary><p><b>Essential:</b> {role.essential.map((m) => `${m.key} ×${m.weight}`).join(", ")}</p><p><b>Core:</b> {role.core.map((m) => `${m.key} ×${m.weight}`).join(", ")}</p><p><b>Stats:</b> {role.stats.map((m) => `${m.key} ×${m.weight}`).join(", ")}</p></details>)}</section>; }
+function PlayerModal({ player, roleId, slot, onClose }: { player: ScoredPlayer; roleId: RoleId; slot: SlotId; onClose: () => void }) {
+  const active = scoreForSlot(player, roleId, slot); return <div className="backdrop" onClick={onClose}><aside className="modal" onClick={(e) => e.stopPropagation()}><button className="modal-close" onClick={onClose}>×</button><span className="eyebrow">Recruitment profile</span><h2>{player.name}</h2><p>{player.club} · {player.nationality} · {player.position}</p><div className="profile-grid"><div><span>Age</span><strong>{player.age ?? "-"}</strong></div><div><span>Value</span><strong>£{fmt(player.valueM)}m</strong></div><div><span>Wage</span><strong>£{fmt(player.wageK)}k/w</strong></div><div><span>Feet</span><strong>{player.preferredFoot ?? `${player.leftFoot ?? "-"} / ${player.rightFoot ?? "-"}`}</strong></div></div><h3>{slot} · {ROLE_CONFIG[roleId].shortName} suitability</h3><div className="big-score"><strong className={scoreClass(active.total)}>{fmt(active.total)}</strong><span>out of 100</span></div><Breakdown score={active} /><h3>All tactic roles</h3>{Object.values(ROLE_CONFIG).map((role) => <div className="role-bar" key={role.id}><span>{role.shortName}</span><i><b style={{ width: `${player.scores[role.id].total}%` }} /></i><strong>{fmt(player.scores[role.id].total)}</strong></div>)}<h3>Why this player scores well</h3><p>{active.strengths.join(", ") || "No standout exported attributes available."}</p><h3>Why this player may be risky</h3><p>{[...active.weaknesses, ...active.warnings].join(", ") || "No major exported-data concerns."}</p></aside></div>;
+}
+function Breakdown({ score }: { score: RoleScore }) { const parts: [string, RoleScore[keyof Pick<RoleScore, "attribute" | "stats" | "hidden" | "position" | "value">]][] = [["Attributes", score.attribute], ["Performance", score.stats], ["Hidden", score.hidden], ["Position", score.position], ["Value", score.value]]; return <div className="breakdown">{parts.map(([label, part]) => <div key={label}><span>{label}</span><strong>{fmt(part.score)}</strong><small>{part.available}/{part.expected} inputs</small></div>)}</div>; }
