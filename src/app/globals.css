@@ -143,6 +143,7 @@ nav .clear { color: var(--red); margin-left: auto; }
 .panel-head { align-items: center; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; padding: 14px; }
 .panel-head.mini { padding: 12px 0 10px; }
 .table-scroll { max-height: calc(100vh - 315px); overflow: auto; }
+.empty-state { color: var(--muted); padding: 28px; }
 table { border-collapse: collapse; font-size: 12px; width: 100%; }
 th { background: #1d1a17; color: var(--orange-2); cursor: pointer; position: sticky; text-align: left; top: 0; }
 th, td { border-bottom: 1px solid rgba(75, 64, 53, 0.7); padding: 8px; white-space: nowrap; }

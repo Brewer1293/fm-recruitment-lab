@@ -110,9 +110,22 @@ function mapColumns(headers: string[]) {
   })) as Record<string, string | undefined>;
 }
 
+const validText = (value?: string) => {
+  const text = clean(value ?? "");
+  return Boolean(text && text !== "-" && text !== "- -" && !/^unknown player/i.test(text));
+};
+
 function normalize(rows: RawPlayer[], columns: Record<string, string | undefined>) {
-  return rows.map((raw, index) => {
-    const player: NormalizedPlayer = { id: String(index + 1), raw, name: raw[columns.name ?? ""] || `Unknown player ${index + 1}` };
+  const players: NormalizedPlayer[] = [];
+  let skippedRows = 0;
+  rows.forEach((raw, index) => {
+    const name = raw[columns.name ?? ""];
+    const position = raw[columns.position ?? ""];
+    if (!validText(name) || !validText(position)) {
+      skippedRows += 1;
+      return;
+    }
+    const player: NormalizedPlayer = { id: String(index + 1), raw, name };
     Object.entries(columns).forEach(([key, header]) => {
       if (!header) return;
       const value = raw[header];
@@ -126,8 +139,9 @@ function normalize(rows: RawPlayer[], columns: Record<string, string | undefined
     player.wageK = wage(raw[columns.wageK ?? ""]);
     const average = (a: string, b: string) => typeof player[a] === "number" && typeof player[b] === "number" ? ((player[a] as number) + (player[b] as number)) / 2 : undefined;
     player.spd = average("pac", "acc"); player.work = average("wor", "sta"); player.setP = average("jum", "bra");
-    return player;
+    players.push(player);
   });
+  return { players, skippedRows };
 }
 
 export async function importFMFiles(files: File[], onProgress: (message: string, percent: number) => void) {
@@ -144,11 +158,11 @@ export async function importFMFiles(files: File[], onProgress: (message: string,
   const missingRequired = REQUIRED.filter((key) => !columns[key]);
   if (missingRequired.length) throw new Error(`Missing required columns: ${missingRequired.join(", ")}.`);
   const missingUseful = [...USEFUL, "consistency", "importantMatches", "pressure", "professionalism"].filter((key) => !columns[key]);
-  const players = normalize(allRows, columns);
+  const { players, skippedRows } = normalize(allRows, columns);
   const report: ValidationReport = {
     files: names, playerCount: players.length, detectedColumns: headers, normalizedColumns: Object.keys(columns).filter((key) => columns[key]),
     missingRequired, missingUseful,
-    messages: [`Large file imported successfully.`, `${players.length.toLocaleString()} players imported.`, `${headers.length} columns detected.`, `${Object.keys(columns).filter((key) => columns[key]).length} columns used for scoring.`, ...(missingUseful.length ? ["Some scoring categories skipped because columns were missing."] : [])],
+    messages: [`Large file imported successfully.`, `${players.length.toLocaleString()} named players imported.`, ...(skippedRows ? [`${skippedRows.toLocaleString()} masked rows skipped because name or position was hidden.`] : []), `${headers.length} columns detected.`, `${Object.keys(columns).filter((key) => columns[key]).length} columns used for scoring.`, ...(missingUseful.length ? ["Some scoring categories skipped because columns were missing."] : [])],
   };
   return { players, report };
 }
