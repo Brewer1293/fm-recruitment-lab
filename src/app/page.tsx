@@ -9,6 +9,7 @@ import type { RoleId, RoleScore, ScoredPlayer, SlotId, ValidationReport } from "
 
 type Tab = "tactic" | "rankings" | "import" | "validation" | "compare" | "settings";
 type SortKey = "roleScore" | "recruitmentScore" | "confidenceScore" | "attribute" | "stats" | "hidden" | "position" | "value" | "age" | "minutes" | "averageRating";
+type SuitabilityFilter = "role-position" | "conversion" | "all";
 const fmt = (value?: number, dp = 1) => value === undefined ? "-" : value.toFixed(dp);
 const scoreClass = (value?: number) => value === undefined ? "" : value >= 80 ? "elite" : value >= 65 ? "good" : value >= 50 ? "okay" : "low";
 const money = (player: ScoredPlayer) => player.transferValueStatus === "not_for_sale" ? "Not for sale" : player.valueM === undefined ? "-" : `£${fmt(player.valueM)}m`;
@@ -28,6 +29,7 @@ export default function Home() {
   const [selected, setSelected] = useState<ScoredPlayer | null>(null), [compareIds, setCompareIds] = useState<string[]>([]);
   const [search, setSearch] = useState(""), [minMinutes, setMinMinutes] = useState(0), [maxAge, setMaxAge] = useState(50);
   const [minAge, setMinAge] = useState(0), [club, setClub] = useState(""), [nation, setNation] = useState(""), [positionFilter, setPositionFilter] = useState(""), [foot, setFoot] = useState("");
+  const [suitabilityFilter, setSuitabilityFilter] = useState<SuitabilityFilter>("role-position");
   const [maxWage, setMaxWage] = useState(1000), [maxValue, setMaxValue] = useState(500), [minScore, setMinScore] = useState(0);
   const [includeMissingStats, setIncludeMissingStats] = useState(true), [includeMissingHidden, setIncludeMissingHidden] = useState(true);
   const [sortKey, setSortKey] = useState<SortKey>("roleScore"), [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
@@ -36,11 +38,12 @@ export default function Home() {
   const rankings = useMemo(() => players.filter((player) => {
     const score = rankingScores.get(player.id)!;
     const valuePass = player.transferValueStatus === "not_for_sale" || Number(player.valueM ?? 0) <= maxValue;
+    const positionPass = suitabilityFilter === "all" || Number(score.position.score ?? 0) >= (suitabilityFilter === "conversion" ? 45 : 80);
     return `${player.name} ${player.club ?? ""}`.toLowerCase().includes(search.toLowerCase()) &&
       Number(player.minutes ?? 0) >= minMinutes && Number(player.age ?? 0) >= minAge && Number(player.age ?? 0) <= maxAge &&
       String(player.club ?? "").toLowerCase().includes(club.toLowerCase()) && String(player.nationality ?? "").toLowerCase().includes(nation.toLowerCase()) &&
       String(player.position ?? "").toLowerCase().includes(positionFilter.toLowerCase()) && `${player.preferredFoot ?? ""} ${player.leftFoot ?? ""} ${player.rightFoot ?? ""}`.toLowerCase().includes(foot.toLowerCase()) &&
-      Number(player.wageK ?? 0) <= maxWage && valuePass && score.roleScore >= minScore &&
+      Number(player.wageK ?? 0) <= maxWage && valuePass && positionPass && score.roleScore >= minScore &&
       (includeMissingStats || score.stats.available > 0) && (includeMissingHidden || score.hidden.available > 0);
   }).sort((a, b) => {
     const aScore = rankingScores.get(a.id)!, bScore = rankingScores.get(b.id)!;
@@ -48,7 +51,7 @@ export default function Home() {
     const aValue = scoreValue(aScore) ?? Number(a[sortKey] ?? 0);
     const bValue = scoreValue(bScore) ?? Number(b[sortKey] ?? 0);
     return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
-  }), [players, rankingScores, search, minMinutes, minAge, maxAge, club, nation, positionFilter, foot, maxWage, maxValue, minScore, includeMissingStats, includeMissingHidden, sortKey, sortDirection]);
+  }), [players, rankingScores, search, minMinutes, minAge, maxAge, club, nation, positionFilter, foot, suitabilityFilter, maxWage, maxValue, minScore, includeMissingStats, includeMissingHidden, sortKey, sortDirection]);
   const compared = players.filter((player) => compareIds.includes(player.id));
 
   async function handleFiles(files: File[]) {
@@ -77,7 +80,7 @@ export default function Home() {
     {tab === "validation" && <Validation report={report} onTactic={() => setTab("tactic")} />}
     {tab === "tactic" && <Tactic onSelect={selectSlot} />}
     {tab === "rankings" && <section className="rank-layout"><section className="panel filters"><div><span className="eyebrow">{slot}</span><h2>{ROLE_CONFIG[roleId].shortName} · {ROLE_CONFIG[roleId].label}</h2><p>Default ranking is Best Role Fit. Use Recruitment Score when you want cost and age included.</p></div>
-      <div className="filter-grid"><label>Search<input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Player or club" /></label><label>Club<input value={club} onChange={(e) => setClub(e.target.value)} placeholder="Any club" /></label><label>Nation<input value={nation} onChange={(e) => setNation(e.target.value)} placeholder="Any nation" /></label><label>Position<input value={positionFilter} onChange={(e) => setPositionFilter(e.target.value)} placeholder="e.g. ST or DM" /></label><label>Footedness<input value={foot} onChange={(e) => setFoot(e.target.value)} placeholder="left / right / either" /></label><label>Minimum minutes<input type="number" value={minMinutes} onChange={(e) => setMinMinutes(Number(e.target.value))} /></label><label>Minimum age<input type="number" value={minAge} onChange={(e) => setMinAge(Number(e.target.value))} /></label><label>Maximum age<input type="number" value={maxAge} onChange={(e) => setMaxAge(Number(e.target.value))} /></label><label>Maximum wage £k/w<input type="number" value={maxWage} onChange={(e) => setMaxWage(Number(e.target.value))} /></label><label>Maximum value £m<input type="number" value={maxValue} onChange={(e) => setMaxValue(Number(e.target.value))} /></label><label>Minimum Role Score<input type="number" value={minScore} onChange={(e) => setMinScore(Number(e.target.value))} /></label></div>
+      <div className="filter-grid"><label>Search<input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Player or club" /></label><label>Club<input value={club} onChange={(e) => setClub(e.target.value)} placeholder="Any club" /></label><label>Nation<input value={nation} onChange={(e) => setNation(e.target.value)} placeholder="Any nation" /></label><label>Position text<input value={positionFilter} onChange={(e) => setPositionFilter(e.target.value)} placeholder="e.g. ST or DM" /></label><label>Role suitability<select value={suitabilityFilter} onChange={(e) => setSuitabilityFilter(e.target.value as SuitabilityFilter)}><option value="role-position">Role position only</option><option value="conversion">Include conversions</option><option value="all">All players</option></select></label><label>Footedness<input value={foot} onChange={(e) => setFoot(e.target.value)} placeholder="left / right / either" /></label><label>Minimum minutes<input type="number" value={minMinutes} onChange={(e) => setMinMinutes(Number(e.target.value))} /></label><label>Minimum age<input type="number" value={minAge} onChange={(e) => setMinAge(Number(e.target.value))} /></label><label>Maximum age<input type="number" value={maxAge} onChange={(e) => setMaxAge(Number(e.target.value))} /></label><label>Maximum wage £k/w<input type="number" value={maxWage} onChange={(e) => setMaxWage(Number(e.target.value))} /></label><label>Maximum value £m<input type="number" value={maxValue} onChange={(e) => setMaxValue(Number(e.target.value))} /></label><label>Minimum Role Score<input type="number" value={minScore} onChange={(e) => setMinScore(Number(e.target.value))} /></label></div>
       <div className="toggles"><label><input type="checkbox" checked={includeMissingStats} onChange={(e) => setIncludeMissingStats(e.target.checked)} /> Include missing stats</label><label><input type="checkbox" checked={includeMissingHidden} onChange={(e) => setIncludeMissingHidden(e.target.checked)} /> Include missing hidden data</label>
       <button onClick={() => exportCSV(`${slot}-${roleId}-rankings.csv`, rankings, rankingScores)}>Export CSV</button><button onClick={() => exportHTML(`${slot}-${roleId}-rankings.html`, rankings, rankingScores)}>Export HTML</button></div></section>
       <RankTable players={rankings.slice(0, 500)} scores={rankingScores} compareIds={compareIds} sort={sort} onOpen={setSelected} onCompare={toggleCompare} /></section>}
