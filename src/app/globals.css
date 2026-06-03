@@ -452,20 +452,119 @@ nav .clear { bottom: 18px; color: var(--red); left: 0; position: absolute; }
 }
 .primary { background: var(--orange); background-image: none; color: #15100a; font-weight: 800; margin-top: 14px; }
 
-.tactic-wrap { display: grid; gap: 8px; grid-template-columns: 250px minmax(500px, 780px); }
+.tactic-wrap {
+  display: grid;
+  gap: 10px;
+  min-height: calc(100vh - 122px);
+}
+.tactic-head {
+  align-items: flex-end;
+  background: rgb(34,34,34);
+  background-image: var(--paper);
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 8px;
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  padding: 14px 16px;
+}
+.tactic-head h2 {
+  font-size: 26px;
+  line-height: 1;
+  margin: 4px 0 0;
+}
+.tactic-head p {
+  color: var(--muted);
+  margin: 0;
+}
+.tactic-board {
+  align-items: stretch;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(560px, 1fr) minmax(260px, 350px);
+  min-height: 0;
+}
 .pitch {
-  aspect-ratio: 1.28;
+  aspect-ratio: 1.45;
   background:
     repeating-linear-gradient(90deg, rgba(0,61,51,.88) 0 12.5%, rgba(0,72,59,.88) 12.5% 25%),
     linear-gradient(rgb(0,61,51), rgb(0,45,39));
   border: 1px solid rgba(255, 255, 255, 0.42);
   border-radius: 0;
+  min-height: 520px;
   position: relative;
 }
 .pitch:before { border: 2px solid rgba(255, 255, 255, 0.42); border-radius: 50%; content: ""; height: 18%; left: 41%; position: absolute; top: 41%; width: 18%; }
-.position { background: rgb(34,34,34); background-image: var(--paper); border-color: rgba(255, 255, 255, 0.45); border-radius: 8px; min-height: 48px; padding: 6px 5px; position: absolute; transform: translate(-50%, -50%); width: 122px; }
+.pitch:after {
+  border: 2px solid rgba(255,255,255,.34);
+  border-left: 0;
+  border-right: 0;
+  content: "";
+  inset: 16px 0;
+  position: absolute;
+  pointer-events: none;
+}
+.position {
+  background: rgb(34,34,34);
+  background-image: var(--paper);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 8px;
+  box-shadow: 0 8px 18px rgba(0,0,0,.32);
+  min-height: 52px;
+  padding: 7px 8px;
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: clamp(74px, 9vw, 104px);
+  z-index: 1;
+}
 .position strong, .position span { display: block; }
-.position span { color: var(--orange-2); font-size: 10px; line-height: 1.1; white-space: normal; }
+.position strong {
+  color: rgb(255,248,238);
+  font-size: 15px;
+  line-height: 1;
+}
+.position span { color: var(--orange-2); font-size: 12px; line-height: 1; margin-top: 5px; white-space: nowrap; }
+.tactic-role-list {
+  display: grid;
+  gap: 7px;
+  grid-template-columns: 1fr;
+}
+.tactic-role-card {
+  align-items: center;
+  background: rgb(34,34,34);
+  background-image: var(--row-paper);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 48px minmax(0, 1fr) 54px;
+  min-height: 48px;
+  padding: 8px 10px;
+  text-align: left;
+}
+.tactic-role-card span {
+  color: var(--orange-2);
+  font-size: 13px;
+  font-weight: 800;
+}
+.tactic-role-card strong {
+  color: rgb(255,248,238);
+  font-size: 13px;
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tactic-role-card small {
+  color: var(--muted);
+  font-size: 11px;
+  text-align: right;
+}
+.tactic-role-card:hover,
+.position:hover {
+  border-color: rgba(255,165,40,.72);
+  color: var(--orange-2);
+}
 
 .filters { margin-bottom: 8px; }
 .filters-head {
@@ -1657,6 +1756,21 @@ code { color: var(--orange-2); }
     grid-template-rows: none;
   }
   .dropzone { min-height: 300px; }
+  .tactic-board {
+    grid-template-columns: 1fr;
+  }
+  .tactic-role-list {
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  }
+  .tactic-role-card {
+    grid-template-columns: 44px minmax(0, 1fr);
+  }
+  .tactic-role-card small {
+    display: none;
+  }
+  .pitch {
+    min-height: 470px;
+  }
 }
 
 @media (max-width: 720px) {
@@ -1665,7 +1779,9 @@ code { color: var(--orange-2); }
   nav:before { display: none; }
   nav button { border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 4px; width: auto; }
   nav .clear { position: static; }
-  .tactic-wrap { grid-template-columns: 1fr; overflow: auto; }
+  .tactic-wrap { overflow: auto; }
+  .tactic-head { align-items: start; display: grid; }
+  .tactic-role-list { grid-template-columns: 1fr; }
   .filter-grid { grid-template-columns: repeat(2, 1fr); }
   .import-panel { min-height: 0; }
   .import-hero, .import-grid, .import-foot { grid-template-columns: 1fr; }
@@ -1674,7 +1790,7 @@ code { color: var(--orange-2); }
   .compare-hero { align-items: stretch; display: grid; }
   .compare-summary, .compare-metric-row { grid-template-columns: 1fr; }
   .instruction-grid, .instruction-split { grid-template-columns: 1fr; }
-  .pitch { min-width: 520px; }
+  .pitch { min-height: 430px; min-width: 520px; }
   .profile-grid.compact, .attribute-groups { grid-template-columns: 1fr; }
   .fm-profile-top, .fm-profile-body, .fm-bottom-panels, .info-tab, .contract-tab, .medical-tab { grid-template-columns: 1fr; }
   .fm-role-list { max-height: 178px; overflow: auto; padding-right: 4px; }
