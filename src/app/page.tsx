@@ -13,7 +13,7 @@ type Tab = "tactic" | "rankings" | "import" | "validation" | "compare" | "settin
 type SortKey = "roleScore" | "recruitmentScore" | "confidenceScore" | "attribute" | "stats" | "hidden" | "position" | "value" | "age" | "minutes" | "averageRating";
 type SuitabilityFilter = "role-position" | "conversion" | "all";
 type PositionFilter = "" | "GK" | "DL" | "DC" | "DR" | "WBL" | "WBR" | "DM" | "ML" | "MC" | "MR" | "AML" | "AMC" | "AMR" | "ST";
-const APP_VERSION = "v0.2.3-default-db";
+const APP_VERSION = "v0.2.4-clean-assets";
 const fmt = (value?: number, dp = 1) => value === undefined ? "-" : value.toFixed(dp);
 const scoreClass = (value?: number) => value === undefined ? "" : value >= 80 ? "elite" : value >= 65 ? "good" : value >= 50 ? "okay" : "low";
 const compactMoney = (value?: number) => {
@@ -257,8 +257,8 @@ function PlayerModal({ player, roleId, slot, onClose }: { player: ScoredPlayer; 
   return <div className="backdrop" onClick={onClose}><aside className="modal fm-profile-modal" onClick={(e) => e.stopPropagation()}><button className="modal-close" onClick={onClose}>×</button>
     <section className="fm-profile-top">
       <div className="fm-player-card">
-        <div className="profile-logo-stack"><div className="flag-tile"><AssetImage src={nationUrl} alt={`${player.nationality ?? "Nation"} logo`} fallback={String(player.nationality ?? "NAT").slice(0, 3).toUpperCase()} /></div><div className="club-tile"><AssetImage src={clubUrl} alt={`${player.club ?? "Club"} logo`} fallback={player.club ? player.club.split(/\s+/).map((part) => part[0]).join("").slice(0, 3).toUpperCase() : "CLB"} /></div></div>
-        <div className="profile-photo-slot"><AssetImage src={faceUrl} alt={`${player.name} face`} fallback={player.name.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase()} /></div>
+        <div className="profile-logo-stack"><div className="flag-tile"><AssetImage src={nationUrl} alt={`${player.nationality ?? "Nation"} logo`} fallback="" /></div><div className="club-tile"><AssetImage src={clubUrl} alt={`${player.club ?? "Club"} logo`} fallback="" /></div></div>
+        <div className="profile-photo-slot"><AssetImage src={faceUrl} alt={`${player.name} face`} fallback="" /></div>
         <div className="profile-status-chip">Int</div>
         <div className="profile-name-strip"><strong>{player.name}</strong><span>Role {fmt(active.roleScore)} · Recruitment {fmt(active.recruitmentScore)} · Confidence {fmt(active.confidenceScore)}</span></div>
       </div>
@@ -281,7 +281,8 @@ function PlayerModal({ player, roleId, slot, onClose }: { player: ScoredPlayer; 
 }
 function AssetImage({ src, alt, fallback }: { src?: string; alt: string; fallback: string }) {
   const [failed, setFailed] = useState(false);
-  return src && !failed ? <img src={src} alt={alt} onError={() => setFailed(true)} /> : <span>{fallback}</span>;
+  if (src && !failed) return <img src={src} alt={alt} onError={() => setFailed(true)} />;
+  return fallback ? <span>{fallback}</span> : null;
 }
 function ProfileTabContent({ tab, player, score, slot }: { tab: Exclude<ModalTab, "Attributes">; player: ScoredPlayer; score: RoleScore; slot: SlotId }) {
   if (tab === "Information") return <section className="fm-tab-panel info-tab"><div className="fm-card-block"><h3>Personal Information</h3><InfoGrid rows={[["Full Name", player.name], ["Personality", field(player, "personality")], ["Media Description", field(player, "mediaDescription")], ["Media Handling", field(player, "mediaHandling")], ["Preferred Foot", field(player, "preferredFoot")], ["Height", height(player.height)], ["Club", player.club], ["Division", player.division]]} /></div><div className="fm-card-block wide"><h3>Nationalities</h3><InfoGrid rows={[["Nationality", player.nationality], ["Second Nationality", player.secondNationality], ["Based", field(player, "basedIn", "based")], ["Position", player.position], ["UID", player.uid], ["Age", player.age]]} /></div></section>;
