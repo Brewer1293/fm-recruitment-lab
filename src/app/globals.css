@@ -961,6 +961,24 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   width: min(1040px, calc(100vw - 28px));
 }
 
+.fm-profile-modal,
+.fm-profile-modal .fm-tabs,
+.fm-profile-modal .fm-role-tabs,
+.fm-profile-modal .fm-role-list,
+.fm-profile-modal .fm-tab-panel {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.fm-profile-modal::-webkit-scrollbar,
+.fm-profile-modal .fm-tabs::-webkit-scrollbar,
+.fm-profile-modal .fm-role-tabs::-webkit-scrollbar,
+.fm-profile-modal .fm-role-list::-webkit-scrollbar,
+.fm-profile-modal .fm-tab-panel::-webkit-scrollbar {
+  display: none;
+  height: 0;
+  width: 0;
+}
+
 .modal-close {
   float: right;
   font-size: 18px;
