@@ -148,17 +148,26 @@ nav {
   width: 185px;
 }
 
-nav:before {
+.brand-title {
+  align-items: center;
   background: url("/skin/icons/fm.png") left center / 26px 26px no-repeat;
   color: var(--text);
-  content: "LAB";
-  font-size: 17px;
+  display: flex;
+  font-size: 14px;
   font-weight: 800;
-  left: 18px;
+  gap: 4px;
+  height: 32px;
   letter-spacing: 0;
-  position: absolute;
+  left: 18px;
   padding-left: 33px;
+  position: absolute;
   top: 22px;
+  white-space: nowrap;
+}
+
+.brand-title b {
+  color: #e42d28;
+  font-weight: 800;
 }
 
 button {

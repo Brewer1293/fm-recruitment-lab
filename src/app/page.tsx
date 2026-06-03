@@ -185,7 +185,7 @@ export default function Home() {
 
   return <main className="shell">
     <header className="hero"><div><span className="eyebrow">FM24 recruitment</span><h1>FM Recruitment Lab</h1><p>Private browser-side scouting from uploaded FM HTML exports. Your file stays on this device.</p></div><div className="hero-stat"><strong>{players.length.toLocaleString()}</strong><span>players loaded</span></div></header>
-    <nav>{(["tactic", "rankings", "import", "validation", "compare", "settings"] as Tab[]).map((value) => <button key={value} className={tab === value ? "active" : ""} onClick={() => setTab(value)}>{value}{value === "compare" ? ` (${compareIds.length})` : ""}</button>)}{players.length > 0 && <button className="clear" onClick={clearData}>Clear local data</button>}</nav>
+    <nav><div className="brand-title"><span>Brewerlabs</span> <b>FM</b> <span>Lab</span></div>{(["tactic", "rankings", "import", "validation", "compare", "settings"] as Tab[]).map((value) => <button key={value} className={tab === value ? "active" : ""} onClick={() => setTab(value)}>{value}{value === "compare" ? ` (${compareIds.length})` : ""}</button>)}{players.length > 0 && <button className="clear" onClick={clearData}>Clear local data</button>}</nav>
     {error && <div className="notice error">{error}</div>}
 
     {tab === "import" && <section className="panel import-panel"><span className="eyebrow">Step one</span><h2>Upload FM HTML exports</h2><p>Select one or more FM24 player-search HTML exports. Files are streamed and scored in browser memory only.</p>
