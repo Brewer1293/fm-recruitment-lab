@@ -129,6 +129,34 @@ button, input, select { font: inherit; }
   text-transform: uppercase;
 }
 
+.default-db-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0 12px;
+}
+
+.default-db-actions button {
+  background: rgba(255,255,255,.055);
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 7px;
+  color: var(--text);
+  cursor: pointer;
+  min-height: 34px;
+  padding: 7px 11px;
+}
+
+.default-db-actions button.primary {
+  background: rgba(255,165,40,.2);
+  border-color: rgba(255,165,40,.45);
+  color: rgb(255,238,210);
+}
+
+.default-db-actions button:disabled {
+  cursor: wait;
+  opacity: .55;
+}
+
 .hero-stat { align-self: center; text-align: right; }
 .hero-stat strong { color: var(--orange); display: block; font-family: "Scoreboard FM", "Proxima FM", Arial, sans-serif; font-size: 30px; line-height: 1; }
 .hero-stat span, .panel-head span { color: var(--muted); font-size: 12px; }

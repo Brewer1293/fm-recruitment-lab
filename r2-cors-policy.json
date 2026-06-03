@@ -1,0 +1,20 @@
+{
+  "rules": [
+    {
+      "id": "FM Recruitment app dataset reads",
+      "allowed": {
+        "origins": [
+          "https://home.brewerlabs.uk",
+          "https://fmapp.brewerlabs.uk",
+          "http://localhost:3000",
+          "http://localhost:4175",
+          "http://127.0.0.1:4175"
+        ],
+        "methods": ["GET", "HEAD"],
+        "headers": ["*"]
+      },
+      "exposeHeaders": ["Content-Length", "Content-Type", "ETag"],
+      "maxAgeSeconds": 3600
+    }
+  ]
+}

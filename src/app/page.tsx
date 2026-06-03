@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { exportCSV, exportHTML } from "../lib/exports";
 import { clubLogoUrl, nationLogoUrl, playerFaceUrl } from "../lib/assetResolver";
+import { clearCachedDefaultDataset, loadDefaultDataset } from "../lib/defaultDataset";
 import { importFMFiles } from "../lib/fmParser";
 import { PRESET_VERSION, ROLE_CONFIG, TACTIC_SLOTS } from "../lib/roleConfig";
 import { scoreForSlot, scorePlayers } from "../lib/scoring";
@@ -12,7 +13,7 @@ type Tab = "tactic" | "rankings" | "import" | "validation" | "compare" | "settin
 type SortKey = "roleScore" | "recruitmentScore" | "confidenceScore" | "attribute" | "stats" | "hidden" | "position" | "value" | "age" | "minutes" | "averageRating";
 type SuitabilityFilter = "role-position" | "conversion" | "all";
 type PositionFilter = "" | "GK" | "DL" | "DC" | "DR" | "WBL" | "WBR" | "DM" | "ML" | "MC" | "MR" | "AML" | "AMC" | "AMR" | "ST";
-const APP_VERSION = "v0.2.2-assets";
+const APP_VERSION = "v0.2.3-default-db";
 const fmt = (value?: number, dp = 1) => value === undefined ? "-" : value.toFixed(dp);
 const scoreClass = (value?: number) => value === undefined ? "" : value >= 80 ? "elite" : value >= 65 ? "good" : value >= 50 ? "okay" : "low";
 const compactMoney = (value?: number) => {
@@ -150,6 +151,7 @@ export default function Home() {
   const [includeMissingStats, setIncludeMissingStats] = useState(true), [includeMissingHidden, setIncludeMissingHidden] = useState(true);
   const [sortKey, setSortKey] = useState<SortKey>("roleScore"), [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [filtersOpen, setFiltersOpen] = useState(true);
+  const defaultLoadStarted = useRef(false);
 
   const rankingScores = useMemo(() => new Map(players.map((player) => [player.id, scoreForSlot(player, roleId, slot)])), [players, roleId, slot]);
   const rankings = useMemo(() => players.filter((player) => {
@@ -171,6 +173,12 @@ export default function Home() {
   }), [players, rankingScores, search, minMinutes, minAge, maxAge, club, nation, positionFilter, foot, suitabilityFilter, maxWage, maxValue, minScore, includeMissingStats, includeMissingHidden, sortKey, sortDirection]);
   const compared = players.filter((player) => compareIds.includes(player.id));
 
+  useEffect(() => {
+    if (defaultLoadStarted.current || players.length) return;
+    defaultLoadStarted.current = true;
+    void loadDefaultPlayers(false);
+  }, [players.length]);
+
   async function handleFiles(files: File[]) {
     setBusy(true); setError(""); setProgress({ message: "Preparing upload", percent: 0 });
     try {
@@ -178,6 +186,18 @@ export default function Home() {
       const scored = scorePlayers(imported.players); setPlayers(scored); setReport(imported.report); setTab("validation");
     } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
     finally { setBusy(false); }
+  }
+  async function loadDefaultPlayers(forceRefresh: boolean) {
+    setBusy(true); setError(""); setProgress({ message: "Loading default database", percent: 0 });
+    try {
+      if (forceRefresh) await clearCachedDefaultDataset();
+      const loaded = await loadDefaultDataset((message, percent) => setProgress({ message, percent }));
+      const scored = scorePlayers(loaded.players);
+      setPlayers(scored); setReport(loaded.report); setTab("rankings");
+    } catch (reason) {
+      setTab("import");
+      setError(reason instanceof Error ? reason.message : String(reason));
+    } finally { setBusy(false); }
   }
   function selectSlot(nextSlot: SlotId, nextRole: RoleId) { setSlot(nextSlot); setRoleId(nextRole); setTab("rankings"); }
   function toggleCompare(id: string) { setCompareIds((current) => current.includes(id) ? current.filter((value) => value !== id) : current.length < 4 ? [...current, id] : current); }
@@ -190,6 +210,7 @@ export default function Home() {
     {error && <div className="notice error">{error}</div>}
 
     {tab === "import" && <section className="panel import-panel"><span className="eyebrow">Step one</span><h2>Upload FM HTML exports</h2><p>Select one or more FM24 player-search HTML exports. Files are streamed and scored in browser memory only.</p>
+      <div className="default-db-actions"><button className="primary" disabled={busy} onClick={() => loadDefaultPlayers(false)}>Load default database</button><button disabled={busy} onClick={() => loadDefaultPlayers(true)}>Refresh default database</button><button disabled={busy} onClick={async () => { await clearCachedDefaultDataset(); setProgress({ message: "Default database cache cleared", percent: 0 }); }}>Clear cached default</button></div>
       <label className="dropzone"><strong>{busy ? "Reading player data..." : "Choose FM HTML files"}</strong><span>Large all-player exports are supported. Missing columns are reported clearly.</span><input type="file" accept=".html,.htm,text/html" multiple disabled={busy} onChange={(event) => handleFiles(Array.from(event.target.files ?? []))} /></label>
       {(busy || progress.percent > 0) && <div className="progress"><div style={{ width: `${progress.percent}%` }} /><span>{progress.message}: {progress.percent}%</span></div>}
     </section>}
