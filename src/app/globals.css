@@ -173,7 +173,7 @@ button {
   background-image: var(--tab-paper);
   background-repeat: repeat-x;
   border: 1px solid rgba(255, 255, 255, 0.13);
-  border-radius: 2px;
+  border-radius: 7px;
   color: var(--text);
   cursor: pointer;
   padding: 7px 11px;
@@ -191,7 +191,7 @@ nav button {
   background: transparent;
   border: 0;
   border-left: 3px solid transparent;
-  border-radius: 0;
+  border-radius: 0 7px 7px 0;
   color: var(--muted);
   display: block;
   padding: 13px 18px;
@@ -244,7 +244,7 @@ nav .clear { bottom: 18px; color: var(--red); left: 0; position: absolute; }
 .breakdown-card {
   appearance: none;
   border: 0;
-  border-radius: 2px;
+  border-radius: 7px;
   color: var(--text);
   cursor: pointer;
   text-align: left;
@@ -293,7 +293,7 @@ nav .clear { bottom: 18px; color: var(--red); left: 0; position: absolute; }
   position: relative;
 }
 .pitch:before { border: 2px solid rgba(255, 255, 255, 0.42); border-radius: 50%; content: ""; height: 18%; left: 41%; position: absolute; top: 41%; width: 18%; }
-.position { background: rgb(34,34,34); background-image: var(--paper); border-color: rgba(255, 255, 255, 0.45); border-radius: 2px; padding: 7px 4px; position: absolute; transform: translate(-50%, -50%); width: 84px; }
+.position { background: rgb(34,34,34); background-image: var(--paper); border-color: rgba(255, 255, 255, 0.45); border-radius: 8px; padding: 7px 4px; position: absolute; transform: translate(-50%, -50%); width: 84px; }
 .position strong, .position span { display: block; }
 .position span { color: var(--orange-2); font-size: 11px; }
 
@@ -367,7 +367,7 @@ td small { color: var(--muted); display: block; margin-top: 3px; }
 tbody tr:nth-child(odd) { background: rgb(34,34,34); }
 tbody tr:nth-child(even) { background: rgb(43,43,43); background-image: var(--row-paper); }
 tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
-.compare { height: 22px; min-width: 24px; padding: 0; }
+.compare { border-radius: 7px; height: 22px; min-width: 24px; padding: 0; }
 .compare.active { border-color: var(--orange); color: var(--orange); }
 
 .elite { color: rgba(0, 250, 0, .98) !important; }
@@ -628,7 +628,7 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   background-image: var(--paper);
   border: 0;
   border-bottom: 0;
-  border-radius: 3px 3px 0 0;
+  border-radius: 8px 8px 0 0;
   display: flex;
   gap: 0;
   margin-bottom: 0;
@@ -734,6 +734,7 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
 }
 .fm-role-tabs button {
   align-items: center;
+  border-radius: 8px;
   display: grid;
   gap: 2px;
   min-width: 70px;
@@ -752,7 +753,7 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
 .fm-role-tabs .active {
   background: rgb(43,43,43);
   background-image: var(--tab-selected-paper);
-  border-radius: 2px;
+  border-radius: 8px;
   color: var(--orange-2);
 }
 .fm-role-tabs .active span,
