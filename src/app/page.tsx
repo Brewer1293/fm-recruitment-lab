@@ -13,7 +13,7 @@ type Tab = "tactic" | "rankings" | "import" | "validation" | "compare" | "instru
 type SortKey = "roleScore" | "recruitmentScore" | "confidenceScore" | "attribute" | "stats" | "hidden" | "position" | "value" | "age" | "minutes" | "averageRating";
 type SuitabilityFilter = "role-position" | "conversion" | "all";
 type PositionFilter = "" | "GK" | "DL" | "DC" | "DR" | "WBL" | "WBR" | "DM" | "ML" | "MC" | "MR" | "AML" | "AMC" | "AMR" | "ST";
-const APP_VERSION = "v0.2.14-profile-role-tabs";
+const APP_VERSION = "v0.2.15-tactic-layout";
 const fmt = (value?: number, dp = 1) => value === undefined ? "-" : value.toFixed(dp);
 const scoreClass = (value?: number) => value === undefined ? "" : value >= 80 ? "elite" : value >= 65 ? "good" : value >= 50 ? "okay" : "low";
 const compactMoney = (value?: number) => {
@@ -243,7 +243,13 @@ function ValidationSummary({ report, onTactic }: { report: ValidationReport; onT
     <details><summary>Detected columns ({report.detectedColumns.length})</summary><p>{report.detectedColumns.join(", ")}</p></details><button className="primary" onClick={onTactic}>Open role board</button></>;
 }
 function Tactic({ onSelect }: { onSelect: (slot: SlotId, role: RoleId) => void }) {
-  return <section className="panel tactic-wrap"><div><span className="eyebrow">Role map</span><h2>Balanced FM24 roles</h2><p>Click a position to open its live rankings.</p></div><div className="pitch">{TACTIC_SLOTS.map((item) => <button key={item.id} className="position" style={{ left: `${item.x}%`, top: `${item.y}%` }} onClick={() => onSelect(item.id, item.roleId)}><strong>{item.id}</strong><span>{roleDisplayName(ROLE_CONFIG[item.roleId])}</span></button>)}</div></section>;
+  return <section className="panel tactic-wrap"><div className="tactic-head"><div><span className="eyebrow">Role map</span><h2>Balanced FM24 roles</h2></div><p>Click any slot to open its rankings.</p></div><div className="tactic-board"><div className="pitch">{TACTIC_SLOTS.map((item) => {
+    const role = ROLE_CONFIG[item.roleId];
+    return <button key={item.id} className="position" style={{ left: `${item.x}%`, top: `${item.y}%` }} onClick={() => onSelect(item.id, item.roleId)}><strong>{item.id}</strong><span>{roleAbbreviation(role)}</span></button>;
+  })}</div><div className="tactic-role-list">{TACTIC_SLOTS.map((item) => {
+    const role = ROLE_CONFIG[item.roleId];
+    return <button key={item.id} className="tactic-role-card" onClick={() => onSelect(item.id, item.roleId)}><span>{item.id}</span><strong>{roleDisplayName(role)}</strong><small>{role.shortName}</small></button>;
+  })}</div></div></section>;
 }
 function RankTable({ players, total, scores, compareIds, sort, onOpen, onCompare }: { players: ScoredPlayer[]; total: number; scores: Map<string, RoleScore>; compareIds: string[]; sort: (key: SortKey) => void; onOpen: (player: ScoredPlayer) => void; onCompare: (id: string) => void }) {
   const heads: [SortKey | "name" | "club" | "position" | "valueM" | "wageK", string][] = [["name", "Player"], ["age", "Age"], ["club", "Club"], ["position", "Position"], ["valueM", "FM Value"], ["wageK", "Wage"], ["roleScore", "Role Score"], ["recruitmentScore", "Recruitment"], ["confidenceScore", "Confidence"], ["attribute", "Attribute"], ["stats", "Adj Stats"], ["hidden", "Hidden/Profile"], ["position", "Position Score"], ["value", "Value Score"], ["minutes", "Mins"], ["averageRating", "Av Rat"]];
