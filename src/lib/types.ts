@@ -6,6 +6,11 @@ export type NormalizedPlayer = Record<string, string | number | RawPlayer | unde
   age?: number;
   club?: string;
   nationality?: string;
+  secondNationality?: string;
+  based?: string;
+  basedIn?: string;
+  division?: string;
+  uid?: string;
   position?: string;
   preferredFoot?: string;
   leftFoot?: string;

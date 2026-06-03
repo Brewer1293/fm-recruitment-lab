@@ -1,7 +1,8 @@
 import type { NormalizedPlayer, RawPlayer, ValidationReport } from "./types";
 
 const ALIASES: Record<string, string[]> = {
-  name: ["name"], age: ["age"], club: ["club", "team"], nationality: ["nat", "nationality"],
+  name: ["name"], age: ["age"], club: ["club", "team"], nationality: ["nat", "nationality"], secondNationality: ["2nd nat", "second nationality"],
+  based: ["based"], basedIn: ["based in"], division: ["division"],
   position: ["position", "pos"], personality: ["personality"], mediaHandling: ["media handling"],
   preferredFoot: ["preferred foot"], leftFoot: ["left foot"], rightFoot: ["right foot"],
   height: ["height"], valueM: ["transfer value", "value"], wageK: ["wage"], minutes: ["mins", "minutes"],
@@ -22,9 +23,9 @@ const ALIASES: Record<string, string[]> = {
   conceded90: ["con/90", "goals conceded/90"], conversionPercentage: ["conv %", "conversion %"], progressivePasses90: ["pr passes/90", "progressive passes/90"],
   longPassCompletion: ["long pass %", "long passes %"], errorsLeadingToGoal90: ["errors/90", "err/90", "errors leading to goal/90"],
 };
-const NUMERIC = new Set(Object.keys(ALIASES).filter((key) => !["name", "club", "nationality", "position", "personality", "mediaHandling", "preferredFoot", "leftFoot", "rightFoot", "height", "uid"].includes(key)));
+const NUMERIC = new Set(Object.keys(ALIASES).filter((key) => !["name", "club", "nationality", "secondNationality", "based", "basedIn", "division", "position", "personality", "mediaHandling", "preferredFoot", "leftFoot", "rightFoot", "height", "uid"].includes(key)));
 const REQUIRED = ["name", "position"];
-const USEFUL = ["age", "club", "nationality", "valueM", "wageK", "minutes", "averageRating", "preferredFoot", "leftFoot", "rightFoot"];
+const USEFUL = ["age", "club", "nationality", "basedIn", "division", "uid", "valueM", "wageK", "minutes", "averageRating", "preferredFoot", "leftFoot", "rightFoot"];
 
 const clean = (value: string) => value.replace(/<[^>]*>/g, " ").replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">").replace(/&#39;/g, "'").replace(/&quot;/gi, '"').replace(/\s+/g, " ").trim();
 const norm = (value: string) => clean(value).toLowerCase().replace(/\.\d+$/, "").trim();

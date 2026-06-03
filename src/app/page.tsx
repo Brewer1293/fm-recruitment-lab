@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { exportCSV, exportHTML } from "../lib/exports";
+import { clubLogoUrl, nationLogoUrl, playerFaceUrl, resolveClubUid, resolveNationUid } from "../lib/assetResolver";
 import { importFMFiles } from "../lib/fmParser";
 import { PRESET_VERSION, ROLE_CONFIG, TACTIC_SLOTS } from "../lib/roleConfig";
 import { scoreForSlot, scorePlayers } from "../lib/scoring";
@@ -153,15 +154,17 @@ function PlayerModal({ player, roleId, slot, onClose }: { player: ScoredPlayer; 
   const active = scoreForSlot(player, roleId, slot), role = ROLE_CONFIG[roleId];
   const roleWeights = new Set(Object.keys(role.attributeWeights).filter((key) => role.attributeWeights[key] >= 7));
   const bestRole = Object.values(ROLE_CONFIG).map((candidate) => ({ role: candidate, score: player.scores[candidate.id].roleScore })).sort((a, b) => b.score - a.score)[0];
+  const faceUrl = playerFaceUrl(player), clubUrl = clubLogoUrl(player), nationUrl = nationLogoUrl(player);
+  const clubUid = resolveClubUid(player), nationUid = resolveNationUid(player.nationality);
   return <div className="backdrop" onClick={onClose}><aside className="modal fm-profile-modal" onClick={(e) => e.stopPropagation()}><button className="modal-close" onClick={onClose}>×</button>
     <section className="fm-profile-top">
       <div className="fm-player-card">
-        <div className="profile-logo-stack"><div className="flag-tile">{String(player.nationality ?? "NAT").slice(0, 3).toUpperCase()}</div><div className="club-tile">{player.club ? player.club.split(/\s+/).map((part) => part[0]).join("").slice(0, 3).toUpperCase() : "CLB"}</div></div>
-        <div className="profile-photo-slot"><span>{player.name.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase()}</span></div>
+        <div className="profile-logo-stack"><div className="flag-tile"><AssetImage src={nationUrl} alt={`${player.nationality ?? "Nation"} logo`} fallback={String(player.nationality ?? "NAT").slice(0, 3).toUpperCase()} /></div><div className="club-tile"><AssetImage src={clubUrl} alt={`${player.club ?? "Club"} logo`} fallback={player.club ? player.club.split(/\s+/).map((part) => part[0]).join("").slice(0, 3).toUpperCase() : "CLB"} /></div></div>
+        <div className="profile-photo-slot"><AssetImage src={faceUrl} alt={`${player.name} face`} fallback={player.name.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase()} /></div>
         <div className="profile-status-chip">Int</div>
         <div className="profile-name-strip"><strong>{player.name}</strong><span>Role {fmt(active.roleScore)} · Recruitment {fmt(active.recruitmentScore)} · Confidence {fmt(active.confidenceScore)}</span></div>
       </div>
-      <div className="fm-info-card"><ProfileLine label="Nationality" value={player.nationality ?? "-"} /><ProfileLine label="Position" value={player.position ?? "-"} /><ProfileLine label="Age" value={player.age ?? "-"} /><ProfileLine label="Wage" value={`£${fmt(player.wageK)}k/w`} splitLabel="Value" splitValue={money(player)} /><ProfileLine label="Role" value={`${slot} · ${role.shortName}`} splitLabel="Best role" splitValue={`${bestRole.role.shortName} ${fmt(bestRole.score)}`} /><ProfileLine label="Minutes" value={fmt(player.minutes)} splitLabel="Status" splitValue={active.warnings.length ? `${active.warnings.length} warning${active.warnings.length === 1 ? "" : "s"}` : "Clear"} /></div>
+      <div className="fm-info-card"><ProfileLine label="Nationality" value={player.nationality ?? "-"} splitLabel="Nation UID" splitValue={nationUid ?? "-"} /><ProfileLine label="Position" value={player.position ?? "-"} /><ProfileLine label="Age" value={player.age ?? "-"} splitLabel="Club UID" splitValue={clubUid ?? "-"} /><ProfileLine label="Wage" value={`£${fmt(player.wageK)}k/w`} splitLabel="Value" splitValue={money(player)} /><ProfileLine label="Role" value={`${slot} · ${role.shortName}`} splitLabel="Best role" splitValue={`${bestRole.role.shortName} ${fmt(bestRole.score)}`} /><ProfileLine label="Minutes" value={fmt(player.minutes)} splitLabel="Status" splitValue={active.warnings.length ? `${active.warnings.length} warning${active.warnings.length === 1 ? "" : "s"}` : "Clear"} /></div>
     </section>
     <div className="fm-tabs">{modalTabs.map((label, index) => <span className={index === 0 ? "active" : ""} key={label}>{label}</span>)}</div>
     <section className="fm-profile-body">
@@ -177,6 +180,10 @@ function PlayerModal({ player, roleId, slot, onClose }: { player: ScoredPlayer; 
     </section>
     <section className="fm-bottom-panels"><div><h3>Strengths</h3><strong>{active.strengths.join(", ") || "No standout exported attributes available."}</strong></div><div><h3>Score breakdown</h3><Breakdown score={active} /></div><div><h3>Scoring notes</h3><p>{active.explanation.join(" ")}</p><p>{[...active.caps, ...active.weaknesses, ...active.warnings].join(", ") || "No major exported-data concerns."}</p></div></section>
   </aside></div>;
+}
+function AssetImage({ src, alt, fallback }: { src?: string; alt: string; fallback: string }) {
+  const [failed, setFailed] = useState(false);
+  return src && !failed ? <img src={src} alt={alt} onError={() => setFailed(true)} /> : <span>{fallback}</span>;
 }
 function ScorePill({ label, value }: { label: string; value: number }) {
   return <div className="score-pill"><span>{label}</span><strong className={scoreClass(value)}>{fmt(value)}</strong></div>;

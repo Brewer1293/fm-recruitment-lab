@@ -373,6 +373,12 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   justify-content: center;
   width: 99px;
 }
+.flag-tile img, .club-tile img {
+  display: block;
+  height: 100%;
+  object-fit: contain;
+  width: 100%;
+}
 .club-tile {
   background: radial-gradient(circle at 50% 52%, rgba(255,255,255,.96) 0 42%, #214b86 43% 67%, #11305c 68%);
   border-radius: 50%;
@@ -399,6 +405,15 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   width: auto;
 }
 .profile-photo-slot span { margin-top: 74px; }
+.profile-photo-slot img {
+  align-self: end;
+  display: block;
+  height: 100%;
+  max-height: 230px;
+  object-fit: contain;
+  object-position: center bottom;
+  width: 100%;
+}
 .profile-status-chip {
   background: #cc7272;
   border-radius: 3px;
