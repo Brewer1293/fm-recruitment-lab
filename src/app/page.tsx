@@ -282,6 +282,13 @@ function formatStatTarget(metric: { target: number; suffix?: string; dp?: number
 function formatStatMetric(player: ScoredPlayer, metric: { field: string; suffix?: string; dp?: number }) {
   return statValue(player, metric.field, metric.dp ?? 2, metric.suffix ?? "");
 }
+function formatStatNumber(value: number, metric: { suffix?: string; dp?: number }) {
+  return `${value.toFixed(metric.dp ?? 2).replace(/\.00$/, "")}${metric.suffix ?? ""}`;
+}
+function formatSignedStat(value: number, metric: { suffix?: string; dp?: number }) {
+  const sign = value > 0 ? "+" : "";
+  return `${sign}${formatStatNumber(value, metric)}`;
+}
 function StagStats({ player, activeSlot }: { player: ScoredPlayer; activeSlot: SlotId }) {
   const [selectedSlot, setSelectedSlot] = useState<SlotId>(activeSlot);
   const tacticSlot = TACTIC_SLOTS.find((item) => item.id === selectedSlot) ?? TACTIC_SLOTS[0];
@@ -290,19 +297,31 @@ function StagStats({ player, activeSlot }: { player: ScoredPlayer; activeSlot: S
   const positiveRows = Object.entries(role.positiveStatWeights).map(([key, weight]) => {
     const metric = STAT_TARGETS[key], value = metric && typeof player[metric.field] === "number" ? player[metric.field] as number : undefined;
     const metricScore = value === undefined || !metric ? undefined : clampScore(value / metric.target * 100);
-    return { key, label: metric?.label ?? key, weight, playerValue: metric ? formatStatMetric(player, metric) : "-", target: metric ? formatStatTarget(metric) : "-", score: metricScore, type: "positive" as const };
+    const difference = value === undefined || !metric ? undefined : value - metric.target;
+    const percent = value === undefined || !metric ? undefined : (value / metric.target - 1) * 100;
+    return { key, label: metric?.label ?? key, metric, weight, playerValue: metric ? formatStatMetric(player, metric) : "-", target: metric ? formatStatTarget(metric) : "-", score: metricScore, difference, percent, type: "positive" as const };
   });
   const penaltyRows = Object.entries(role.negativeStatPenalties).map(([key, weight]) => {
     const metric = STAT_TARGETS[key], value = metric && typeof player[metric.field] === "number" ? player[metric.field] as number : undefined;
     const metricScore = value === undefined || !metric ? undefined : clampScore(value / metric.target * 100);
-    return { key, label: metric?.label ?? key, weight, playerValue: metric ? formatStatMetric(player, metric) : "-", target: "Lower is better", score: metricScore, type: "penalty" as const };
+    const difference = value === undefined || !metric ? undefined : value - metric.target;
+    const percent = value === undefined || !metric ? undefined : (value / metric.target - 1) * 100;
+    return { key, label: metric?.label ?? key, metric, weight, playerValue: metric ? formatStatMetric(player, metric) : "-", target: metric ? `${formatStatTarget(metric)} max` : "Lower is better", score: metricScore, difference, percent, type: "penalty" as const };
   });
   const rows = [...positiveRows, ...penaltyRows];
+  const rowTone = (row: typeof rows[number]) => {
+    if (row.difference === undefined) return "missing";
+    const favourable = row.type === "penalty" ? row.difference <= 0 : row.difference >= 0;
+    return favourable ? "over" : "under";
+  };
   return <section className="fm-tab-panel stats-tab"><div className="fm-role-tabs tactic-stag-tabs">{TACTIC_SLOTS.map((item) => <button key={item.id} type="button" className={selectedSlot === item.id ? "active" : ""} onClick={() => setSelectedSlot(item.id)}><strong>{item.id}</strong><span>{ROLE_CONFIG[item.roleId].shortName}</span></button>)}</div>
     <div className="stag-summary"><ScorePill label="Raw STAG" value={score.rawStats} /><ScorePill label="Adjusted STAG" value={score.stats.score ?? 50} /><ScorePill label="Minutes confidence" value={confidence * 100} /><ScorePill label="Inputs" value={(score.stats.available / Math.max(score.stats.expected, 1)) * 100} /></div>
     <h3>{tacticSlot.id} · {role.shortName} performance model</h3>
-    <table className="fm-stat-table"><thead><tr><th>Metric</th><th>Weight</th><th>Player</th><th>Benchmark</th><th>{role.shortName} score</th></tr></thead><tbody>{rows.map((row) => <tr key={`${row.type}-${row.key}`}><td><strong>{row.label}</strong><small>{row.type === "penalty" ? "Negative penalty" : "Positive role stat"}</small></td><td>{(row.weight * 100).toFixed(0)}%</td><td>{row.playerValue}</td><td>{row.target}</td><td className={row.type === "penalty" ? "low" : scoreClass(row.score)}>{row.score === undefined ? "Missing" : `${fmt(row.score, 1)}${row.type === "penalty" ? " penalty" : ""}`}</td></tr>)}</tbody></table>
-    <p className="muted-tab-note">Adjusted STAG uses the same shrinkage as the ranking engine: 50 + ((raw score - 50) x minutes confidence). Missing stats are excluded from the raw score and reduce confidence.</p>
+    <table className="fm-stat-table stag-compare-table"><thead><tr><th>Metric</th><th>Weight</th><th>Player</th><th>Elite baseline</th><th>Difference</th><th>% vs baseline</th><th>Score impact</th></tr></thead><tbody>{rows.map((row) => {
+      const tone = rowTone(row), favourableLabel = row.type === "penalty" ? "Under baseline is good" : "Over baseline is good";
+      return <tr key={`${row.type}-${row.key}`}><td><strong>{row.label}</strong><small>{favourableLabel}</small></td><td>{(row.weight * 100).toFixed(0)}%</td><td>{row.playerValue}</td><td>{row.target}</td><td className={`baseline-delta ${tone}`}>{row.difference === undefined || !row.metric ? "Missing" : formatSignedStat(row.difference, row.metric)}</td><td className={`baseline-delta ${tone}`}>{row.percent === undefined ? "-" : `${row.percent > 0 ? "+" : ""}${row.percent.toFixed(0)}%`}</td><td className={row.type === "penalty" ? "low" : scoreClass(row.score)}>{row.score === undefined ? "Missing" : `${fmt(row.score, 1)}${row.type === "penalty" ? " penalty" : ""}`}</td></tr>;
+    })}</tbody></table>
+    <p className="muted-tab-note">Baseline is the role target used by the scoring model. Positive metrics want to be above baseline; negative metrics such as errors want to be below it. Adjusted STAG then shrinks the raw score by minutes confidence.</p>
   </section>;
 }
 function ScorePill({ label, value }: { label: string; value: number }) {
