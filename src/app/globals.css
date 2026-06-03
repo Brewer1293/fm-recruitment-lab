@@ -715,20 +715,63 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
 }
 .fm-role-tabs {
   display: flex;
-  gap: 20px;
+  gap: 8px;
   margin-bottom: 8px;
   overflow: auto;
 }
-.fm-role-tabs span {
+.fm-role-tabs span,
+.fm-role-tabs button {
   color: rgba(244,244,244,.58);
   font-size: 15px;
   padding: 7px 12px;
+}
+.fm-role-tabs button {
+  align-items: center;
+  display: grid;
+  gap: 2px;
+  min-width: 70px;
+  text-align: center;
+  text-transform: none;
+}
+.fm-role-tabs button strong {
+  color: rgb(255,248,238);
+  font-size: 13px;
+  line-height: 1;
+}
+.fm-role-tabs button span {
+  font-size: 11px;
+  padding: 0;
 }
 .fm-role-tabs .active {
   background: rgb(43,43,43);
   background-image: var(--tab-selected-paper);
   border-radius: 2px;
   color: var(--orange-2);
+}
+.fm-role-tabs .active span,
+.fm-role-tabs .active strong { color: var(--orange-2); }
+.stag-summary {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  margin: 10px 0 14px;
+}
+.score-pill {
+  background: rgba(25,25,25,.56);
+  border-radius: 2px;
+  padding: 9px 10px;
+}
+.score-pill span {
+  color: var(--muted);
+  display: block;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+.score-pill strong {
+  display: block;
+  font-size: 22px;
+  line-height: 1;
+  margin-top: 5px;
 }
 .fm-stat-table, .fm-history-table {
   border-collapse: collapse;

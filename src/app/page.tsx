@@ -65,6 +65,27 @@ const ATTRIBUTE_LABELS: Record<string, string> = {
   Acc: "Acceleration", Pac: "Pace", Sta: "Stamina", Str: "Strength", Agi: "Agility", Bal: "Balance", Jum: "Jumping Reach", Nat: "Natural Fitness",
   Ref: "Reflexes", "1v1": "One On Ones", Cmd: "Command Of Area", Kic: "Kicking", Thr: "Throwing", Han: "Handling", Aer: "Aerial Reach", Com: "Communication", Ecc: "Eccentricity", Pun: "Punching", TRO: "Rushing Out",
 };
+const STAT_TARGETS: Record<string, { field: string; target: number; label: string; suffix?: string; dp?: number }> = {
+  savePct: { field: "savePercentage", target: 80, label: "Save Percentage", suffix: "%", dp: 0 },
+  cleanSheets90: { field: "cleanSheets90", target: 0.35, label: "Clean Sheets per 90" },
+  passCompletionPct: { field: "passCompletion", target: 90, label: "Pass Completion", suffix: "%", dp: 0 },
+  longPassCompletionPct: { field: "longPassCompletion", target: 72, label: "Long Pass Completion", suffix: "%", dp: 0 },
+  avgRating: { field: "averageRating", target: 7.6, label: "Average Rating", dp: 2 },
+  xA90: { field: "xa90", target: 0.35, label: "Expected Assists per 90" },
+  assists90: { field: "assists90", target: 0.45, label: "Assists per 90" },
+  keyPasses90: { field: "keyPasses90", target: 2.7, label: "Key Passes per 90" },
+  crossesCompleted90: { field: "crossesCompleted90", target: 1.8, label: "Crosses Completed per 90" },
+  dribblesCompleted90: { field: "dribbles90", target: 4, label: "Dribbles Completed per 90" },
+  tacklesWon90: { field: "tackles90", target: 3.2, label: "Tackles Won per 90" },
+  interceptions90: { field: "interceptions90", target: 2.6, label: "Interceptions per 90" },
+  progressivePasses90: { field: "progressivePasses90", target: 8, label: "Progressive Passes per 90" },
+  headersWonPct: { field: "headersPct", target: 75, label: "Headers Won", suffix: "%", dp: 0 },
+  xG90: { field: "xg90", target: 0.65, label: "Expected Goals per 90" },
+  goals90: { field: "goals90", target: 0.75, label: "Goals per 90" },
+  shots90: { field: "shots90", target: 4, label: "Shots per 90" },
+  shotConversionPct: { field: "conversionPercentage", target: 22, label: "Shot Conversion", suffix: "%", dp: 0 },
+  errorsLeadingToGoal90: { field: "errorsLeadingToGoal90", target: 0.25, label: "Errors Leading to Goal per 90" },
+};
 const isGoalkeeper = (player: ScoredPlayer) => positionCodes(player.position).has("GK");
 const textValue = (value: unknown) => value === undefined || value === null || value === "" ? "-" : String(value);
 const field = (player: ScoredPlayer, ...keys: string[]) => {
@@ -87,6 +108,8 @@ const capsLine = (player: ScoredPlayer) => {
   return `${caps ?? 0} caps / ${goals ?? 0} goals`;
 };
 const statValue = (player: ScoredPlayer, key: string, dp = 2, suffix = "") => typeof player[key] === "number" ? `${(player[key] as number).toFixed(dp)}${suffix}` : "-";
+const clampScore = (value: number) => Math.min(100, Math.max(0, value));
+const minutesConfidence = (minutes = 0) => minutes <= 90 ? 0.1 : minutes <= 180 ? 0.2 : minutes <= 300 ? 0.35 : minutes <= 600 ? 0.55 : minutes <= 900 ? 0.75 : minutes <= 1500 ? 0.9 : 1;
 const POSITION_CODE_CACHE = new Map<string, Set<string>>();
 function positionCodes(position?: string) {
   const text = String(position ?? "").toUpperCase().replace(/\s+/g, "");
@@ -230,17 +253,17 @@ function PlayerModal({ player, roleId, slot, onClose }: { player: ScoredPlayer; 
         })}</div>;
       })}</div></section>
     </section>
-    <section className="fm-bottom-panels"><div><h3>Strengths</h3><StrengthList items={active.strengths} /></div><div><h3>Score breakdown</h3><Breakdown score={active} /></div><div><h3>Scoring notes</h3><ScoringNotes score={active} /></div></section></> : <ProfileTabContent tab={profileTab} player={player} score={active} />}
+    <section className="fm-bottom-panels"><div><h3>Strengths</h3><StrengthList items={active.strengths} /></div><div><h3>Score breakdown</h3><Breakdown score={active} /></div><div><h3>Scoring notes</h3><ScoringNotes score={active} /></div></section></> : <ProfileTabContent tab={profileTab} player={player} score={active} slot={slot} />}
   </aside></div>;
 }
 function AssetImage({ src, alt, fallback }: { src?: string; alt: string; fallback: string }) {
   const [failed, setFailed] = useState(false);
   return src && !failed ? <img src={src} alt={alt} onError={() => setFailed(true)} /> : <span>{fallback}</span>;
 }
-function ProfileTabContent({ tab, player, score }: { tab: Exclude<ModalTab, "Attributes">; player: ScoredPlayer; score: RoleScore }) {
+function ProfileTabContent({ tab, player, score, slot }: { tab: Exclude<ModalTab, "Attributes">; player: ScoredPlayer; score: RoleScore; slot: SlotId }) {
   if (tab === "Information") return <section className="fm-tab-panel info-tab"><div className="fm-card-block"><h3>Personal Information</h3><InfoGrid rows={[["Full Name", player.name], ["Personality", field(player, "personality")], ["Media Description", field(player, "mediaDescription")], ["Media Handling", field(player, "mediaHandling")], ["Preferred Foot", field(player, "preferredFoot")], ["Height", height(player.height)], ["Club", player.club], ["Division", player.division]]} /></div><div className="fm-card-block wide"><h3>Nationalities</h3><InfoGrid rows={[["Nationality", player.nationality], ["Second Nationality", player.secondNationality], ["Based", field(player, "basedIn", "based")], ["Position", player.position], ["UID", player.uid], ["Age", player.age]]} /></div></section>;
 
-  if (tab === "FM Stag Stats") return <section className="fm-tab-panel stats-tab"><div className="fm-role-tabs"><span className="active">{isGoalkeeper(player) ? "GK" : "Role"}</span><span>FB</span><span>WB</span><span>CB</span><span>BPD</span><span>DM</span><span>CM</span><span>AM</span><span>C-WA</span><span>G-WA</span><span>C-ST</span><span>G-ST</span></div><h3>{isGoalkeeper(player) ? "Goalkeeping across the 'Big 5' leagues" : "Performance across the 'Big 5' leagues"}</h3><table className="fm-stat-table"><thead><tr><th>{isGoalkeeper(player) ? "Goalkeeping - Defensive" : "Role performance"}</th><th>Poor</th><th>Average</th><th>Good</th><th>Rating</th></tr></thead><tbody>{statRows(player).map((row) => <tr key={row.label}><td>{row.label}</td><td className="low">{row.poor}</td><td className="average">{row.average}</td><td className="good">{row.good}</td><td className="rating">{row.rating}</td></tr>)}</tbody></table></section>;
+  if (tab === "FM Stag Stats") return <StagStats player={player} activeSlot={slot} />;
 
   if (tab === "Contract Info") return <section className="fm-tab-panel contract-tab"><div className="fm-card-block"><h3>{player.club ?? "Current Club"}</h3><div className="contract-hero"><strong>{compactWage(player.wageK)} per week</strong><span>{money(player)} transfer value</span></div><InfoGrid rows={[["Contract Type", field(player, "contractType") ?? "Not exported"], ["Expires", field(player, "contractExpires") ?? "Not exported"], ["Started", field(player, "contractStarted") ?? "Not exported"], ["Playing Time", field(player, "playingTime") ?? "Not exported"], ["Wage", compactWage(player.wageK)], ["Value", money(player)]]} /></div><div className="fm-card-block"><h3>Bonuses</h3><InfoGrid rows={[["Appearance Fee", field(player, "appearanceFee") ?? "Not exported"], ["Goal Bonus", field(player, "goalBonus") ?? "Not exported"], ["Unused Substitute Fee", field(player, "unusedSubFee") ?? "Not exported"], ["Loyalty Bonus", field(player, "loyaltyBonus") ?? "Not exported"]]} /></div><div className="fm-card-block"><h3>Clauses</h3><InfoGrid rows={[["Release Clause", field(player, "releaseClause") ?? "Not exported"], ["Yearly Wage Rise", field(player, "yearlyWageRise") ?? "Not exported"], ["Extension Option", field(player, "extensionOption") ?? "Not exported"], ["Sell-on Clause", field(player, "sellOnClause") ?? "Not exported"]]} /></div></section>;
 
@@ -253,19 +276,34 @@ function ProfileTabContent({ tab, player, score }: { tab: Exclude<ModalTab, "Att
 function InfoGrid({ rows }: { rows: [string, unknown][] }) {
   return <div className="fm-info-grid">{rows.map(([label, value]) => <div key={label}><span>{label}</span><strong>{textValue(value)}</strong></div>)}</div>;
 }
-function statRows(player: ScoredPlayer) {
-  if (isGoalkeeper(player)) return [
-    { label: "Goals conceded per 90", poor: "2.15", average: "1.41", good: "0.75", rating: statValue(player, "conceded90") },
-    { label: "Save Percentage", poor: "62%", average: "72%", good: "80%", rating: statValue(player, "savePercentage", 0, "%") },
-    { label: "Clean Sheets per 90", poor: "0.05", average: "0.20", good: "0.35", rating: statValue(player, "cleanSheets90") },
-    { label: "Pass Completion Percentage", poor: "47%", average: "78%", good: "97%", rating: statValue(player, "passCompletion", 0, "%") },
-  ];
-  return [
-    { label: "Goals per 90", poor: "0.10", average: "0.35", good: "0.75", rating: statValue(player, "goals90") },
-    { label: "Expected Goals per 90", poor: "0.10", average: "0.35", good: "0.65", rating: statValue(player, "xg90") },
-    { label: "Assists per 90", poor: "0.05", average: "0.20", good: "0.45", rating: statValue(player, "assists90") },
-    { label: "Pass Completion Percentage", poor: "68%", average: "82%", good: "90%", rating: statValue(player, "passCompletion", 0, "%") },
-  ];
+function formatStatTarget(metric: { target: number; suffix?: string; dp?: number }) {
+  return `${metric.target.toFixed(metric.dp ?? 2).replace(/\.00$/, "")}${metric.suffix ?? ""}`;
+}
+function formatStatMetric(player: ScoredPlayer, metric: { field: string; suffix?: string; dp?: number }) {
+  return statValue(player, metric.field, metric.dp ?? 2, metric.suffix ?? "");
+}
+function StagStats({ player, activeSlot }: { player: ScoredPlayer; activeSlot: SlotId }) {
+  const [selectedSlot, setSelectedSlot] = useState<SlotId>(activeSlot);
+  const tacticSlot = TACTIC_SLOTS.find((item) => item.id === selectedSlot) ?? TACTIC_SLOTS[0];
+  const role = ROLE_CONFIG[tacticSlot.roleId], score = scoreForSlot(player, role.id, tacticSlot.id);
+  const confidence = minutesConfidence(Number(player.minutes ?? 0));
+  const positiveRows = Object.entries(role.positiveStatWeights).map(([key, weight]) => {
+    const metric = STAT_TARGETS[key], value = metric && typeof player[metric.field] === "number" ? player[metric.field] as number : undefined;
+    const metricScore = value === undefined || !metric ? undefined : clampScore(value / metric.target * 100);
+    return { key, label: metric?.label ?? key, weight, playerValue: metric ? formatStatMetric(player, metric) : "-", target: metric ? formatStatTarget(metric) : "-", score: metricScore, type: "positive" as const };
+  });
+  const penaltyRows = Object.entries(role.negativeStatPenalties).map(([key, weight]) => {
+    const metric = STAT_TARGETS[key], value = metric && typeof player[metric.field] === "number" ? player[metric.field] as number : undefined;
+    const metricScore = value === undefined || !metric ? undefined : clampScore(value / metric.target * 100);
+    return { key, label: metric?.label ?? key, weight, playerValue: metric ? formatStatMetric(player, metric) : "-", target: "Lower is better", score: metricScore, type: "penalty" as const };
+  });
+  const rows = [...positiveRows, ...penaltyRows];
+  return <section className="fm-tab-panel stats-tab"><div className="fm-role-tabs tactic-stag-tabs">{TACTIC_SLOTS.map((item) => <button key={item.id} type="button" className={selectedSlot === item.id ? "active" : ""} onClick={() => setSelectedSlot(item.id)}><strong>{item.id}</strong><span>{ROLE_CONFIG[item.roleId].shortName}</span></button>)}</div>
+    <div className="stag-summary"><ScorePill label="Raw STAG" value={score.rawStats} /><ScorePill label="Adjusted STAG" value={score.stats.score ?? 50} /><ScorePill label="Minutes confidence" value={confidence * 100} /><ScorePill label="Inputs" value={(score.stats.available / Math.max(score.stats.expected, 1)) * 100} /></div>
+    <h3>{tacticSlot.id} · {role.shortName} performance model</h3>
+    <table className="fm-stat-table"><thead><tr><th>Metric</th><th>Weight</th><th>Player</th><th>Benchmark</th><th>{role.shortName} score</th></tr></thead><tbody>{rows.map((row) => <tr key={`${row.type}-${row.key}`}><td><strong>{row.label}</strong><small>{row.type === "penalty" ? "Negative penalty" : "Positive role stat"}</small></td><td>{(row.weight * 100).toFixed(0)}%</td><td>{row.playerValue}</td><td>{row.target}</td><td className={row.type === "penalty" ? "low" : scoreClass(row.score)}>{row.score === undefined ? "Missing" : `${fmt(row.score, 1)}${row.type === "penalty" ? " penalty" : ""}`}</td></tr>)}</tbody></table>
+    <p className="muted-tab-note">Adjusted STAG uses the same shrinkage as the ranking engine: 50 + ((raw score - 50) x minutes confidence). Missing stats are excluded from the raw score and reduce confidence.</p>
+  </section>;
 }
 function ScorePill({ label, value }: { label: string; value: number }) {
   return <div className="score-pill"><span>{label}</span><strong className={scoreClass(value)}>{fmt(value)}</strong></div>;
