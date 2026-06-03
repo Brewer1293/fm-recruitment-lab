@@ -13,7 +13,7 @@ type Tab = "tactic" | "rankings" | "import" | "validation" | "compare" | "instru
 type SortKey = "roleScore" | "recruitmentScore" | "confidenceScore" | "attribute" | "stats" | "hidden" | "position" | "value" | "age" | "minutes" | "apps" | "goals" | "assists" | "averageRating";
 type SuitabilityFilter = "role-position" | "conversion" | "all";
 type PositionFilter = "" | "GK" | "DL" | "DC" | "DR" | "WBL" | "WBR" | "DM" | "ML" | "MC" | "MR" | "AML" | "AMC" | "AMR" | "ST";
-const APP_VERSION = "v0.2.19-readable-scouting-filters";
+const APP_VERSION = "v0.2.20-profile-rank-navigation";
 const fmt = (value?: number, dp = 1) => value === undefined ? "-" : value.toFixed(dp);
 const scoreClass = (value?: number) => value === undefined ? "" : value >= 80 ? "elite" : value >= 65 ? "good" : value >= 50 ? "okay" : "low";
 const compactMoney = (value?: number) => {
@@ -183,6 +183,7 @@ export default function Home() {
   }), [players, rankingScores, search, minMinutes, minAge, maxAge, club, nation, positionFilter, foot, suitabilityFilter, maxWage, maxValue, minScore, includeMissingStats, includeMissingHidden, sortKey, sortDirection]);
   const compared = players.filter((player) => compareIds.includes(player.id));
   const stagBenchmarks = useMemo(() => buildStagBenchmarks(players), [players]);
+  const selectedRankIndex = selected ? rankings.findIndex((player) => player.id === selected.id) : -1;
 
   useEffect(() => {
     if (defaultLoadStarted.current || players.length) return;
@@ -214,6 +215,11 @@ export default function Home() {
   function toggleCompare(id: string) { setCompareIds((current) => current.includes(id) ? current.filter((value) => value !== id) : current.length < 4 ? [...current, id] : current); }
   function clearData() { setPlayers([]); setReport(null); setCompareIds([]); setSelected(null); setTab("import"); }
   function sort(next: SortKey) { if (sortKey === next) setSortDirection((value) => value === "desc" ? "asc" : "desc"); else { setSortKey(next); setSortDirection("desc"); } }
+  function selectAdjacentPlayer(direction: -1 | 1) {
+    if (selectedRankIndex < 0) return;
+    const nextPlayer = rankings[selectedRankIndex + direction];
+    if (nextPlayer) setSelected(nextPlayer);
+  }
 
   return <main className="shell">
     <header className="hero"><div><span className="eyebrow">FM24 recruitment</span><h1>FM Recruitment Lab</h1><p>Private browser-side scouting from uploaded FM HTML exports. Your file stays on this device.</p></div><div className="hero-stat"><strong>{players.length.toLocaleString()}</strong><span>players loaded</span></div></header>
@@ -237,7 +243,7 @@ export default function Home() {
     {tab === "compare" && <Comparison players={compared} roleId={roleId} onExport={() => exportCSV("fm-recruitment-comparison.csv", compared)} />}
     {tab === "instructions" && <Instructions />}
     {tab === "settings" && <Settings report={report} onTactic={() => setTab("tactic")} onExport={() => exportCSV("fm-recruitment-full-scored-dataset.csv", players)} />}
-    {selected && <PlayerModal player={selected} slot={slot} roleId={roleId} benchmarks={stagBenchmarks} onClose={() => setSelected(null)} />}
+    {selected && <PlayerModal player={selected} slot={slot} roleId={roleId} benchmarks={stagBenchmarks} rankIndex={selectedRankIndex} rankTotal={rankings.length} onPrevious={selectedRankIndex > 0 ? () => selectAdjacentPlayer(-1) : undefined} onNext={selectedRankIndex >= 0 && selectedRankIndex < rankings.length - 1 ? () => selectAdjacentPlayer(1) : undefined} onClose={() => setSelected(null)} />}
     <div className="app-version">{APP_VERSION}</div>
   </main>;
 }
@@ -303,7 +309,7 @@ function Instructions() {
     <div className="instruction-section"><h3>Useful notes</h3><p>Not for sale means the club does not want to sell; it is not treated as a missing or zero value. Value ranges use the midpoint for display and scoring. Player faces, club logos and nation logos are loaded from the Cloudflare R2 asset bucket when a UID/path match exists.</p></div>
   </section>;
 }
-function PlayerModal({ player, roleId, slot, benchmarks, onClose }: { player: ScoredPlayer; roleId: RoleId; slot: SlotId; benchmarks: StagBenchmarkMap; onClose: () => void }) {
+function PlayerModal({ player, roleId, slot, benchmarks, rankIndex, rankTotal, onPrevious, onNext, onClose }: { player: ScoredPlayer; roleId: RoleId; slot: SlotId; benchmarks: StagBenchmarkMap; rankIndex: number; rankTotal: number; onPrevious?: () => void; onNext?: () => void; onClose: () => void }) {
   const [profileTab, setProfileTab] = useState<ModalTab>("Attributes");
   const active = scoreForSlot(player, roleId, slot), role = ROLE_CONFIG[roleId];
   const roleWeights = new Set(Object.keys(role.attributeWeights).filter((key) => role.attributeWeights[key] >= 7));
@@ -315,7 +321,26 @@ function PlayerModal({ player, roleId, slot, benchmarks, onClose }: { player: Sc
       document.body.style.overflow = previousOverflow;
     };
   }, []);
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target && ["INPUT", "SELECT", "TEXTAREA"].includes(target.tagName)) return;
+      if ((event.key === "ArrowUp" || event.key === "ArrowLeft") && onPrevious) {
+        event.preventDefault();
+        onPrevious();
+      }
+      if ((event.key === "ArrowDown" || event.key === "ArrowRight") && onNext) {
+        event.preventDefault();
+        onNext();
+      }
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onPrevious, onNext, onClose]);
+  const rankLabel = rankIndex >= 0 ? `${rankIndex + 1} / ${rankTotal.toLocaleString()}` : "-";
   return <div className="backdrop" onClick={onClose}><aside className="modal fm-profile-modal" onClick={(e) => e.stopPropagation()}><button className="modal-close" onClick={onClose}>×</button>
+    <div className="profile-rank-nav" aria-label="Player ranking navigation"><button type="button" onClick={onPrevious} disabled={!onPrevious} title="Previous ranked player">↑</button><span>{rankLabel}</span><button type="button" onClick={onNext} disabled={!onNext} title="Next ranked player">↓</button></div>
     <section className="fm-profile-top">
       <div className="fm-player-card">
         <div className="profile-logo-stack"><div className="flag-tile"><AssetImage src={nationUrl} alt={`${player.nationality ?? "Nation"} logo`} fallback="" /></div><div className="club-tile"><AssetImage src={clubUrl} alt={`${player.club ?? "Club"} logo`} fallback="" /></div></div>
