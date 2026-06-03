@@ -944,6 +944,7 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   display: flex;
   inset: 0;
   justify-content: center;
+  padding: 12px;
   position: fixed;
   z-index: 5;
 }
@@ -955,10 +956,10 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   border-top: 0;
   border-radius: 3px;
   box-shadow: 0 28px 90px rgba(0, 0, 0, 0.72);
-  height: min(92vh, 1010px);
+  max-height: calc(100vh - 24px);
   overflow: auto;
   padding: 10px;
-  width: min(1040px, calc(100vw - 28px));
+  width: min(1220px, calc(100vw - 24px));
 }
 
 .fm-profile-modal,
@@ -989,7 +990,10 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   z-index: 2;
 }
 
-.fm-profile-top { display: grid; gap: 10px; grid-template-columns: 390px minmax(0, 1fr); margin-bottom: 10px; }
+.fm-profile-modal {
+  height: auto;
+}
+.fm-profile-top { display: grid; gap: 10px; grid-template-columns: minmax(330px, 380px) minmax(0, 1fr); margin-bottom: 8px; }
 .fm-player-card {
   align-items: stretch;
   background: rgb(43,43,43);
@@ -998,20 +1002,20 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   border-radius: 3px;
   display: grid;
   gap: 0;
-  grid-template-columns: 152px 1fr;
-  grid-template-rows: 1fr 52px;
-  min-height: 282px;
+  grid-template-columns: 140px 1fr;
+  grid-template-rows: 1fr 46px;
+  min-height: 248px;
   overflow: hidden;
   padding: 0;
   position: relative;
 }
 .profile-logo-stack {
   display: grid;
-  gap: 18px;
+  gap: 12px;
   grid-column: 1;
   grid-row: 1;
   justify-items: center;
-  padding: 24px 14px 14px;
+  padding: 18px 12px 12px;
 }
 .flag-tile, .club-tile {
   align-items: center;
@@ -1035,9 +1039,9 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
 .club-tile {
   background: transparent;
   border-radius: 0;
-  height: 90px;
+  height: 82px;
   text-shadow: none;
-  width: 90px;
+  width: 82px;
 }
 .profile-photo-slot {
   align-items: center;
@@ -1059,7 +1063,7 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   align-self: end;
   display: block;
   height: 100%;
-  max-height: 230px;
+  max-height: 202px;
   object-fit: contain;
   object-position: center bottom;
   width: 100%;
@@ -1084,13 +1088,13 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   grid-column: 1 / -1;
   grid-row: 2;
   justify-items: center;
-  padding: 8px 12px 7px;
+  padding: 7px 12px 6px;
   text-align: center;
 }
 .profile-name-strip strong {
   color: white;
   font-family: "GT FM", "Proxima FM", Arial, sans-serif;
-  font-size: 20px;
+  font-size: 19px;
   line-height: 1.1;
   text-transform: uppercase;
 }
@@ -1107,7 +1111,7 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   display: grid;
   gap: 0;
   overflow: hidden;
-  padding: 9px 12px;
+  padding: 7px 10px;
 }
 .top-info-card {
   align-content: center;
@@ -1117,7 +1121,7 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   align-items: center;
   color: rgb(244,244,244);
   display: grid;
-  min-height: 39px;
+  min-height: 34px;
   padding: 0 11px;
 }
 .top-info-row:nth-child(even) {
@@ -1152,7 +1156,7 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   white-space: nowrap;
 }
 .nationality-row {
-  min-height: 50px;
+  min-height: 43px;
 }
 .nationality-row strong {
   display: grid;
@@ -1222,12 +1226,12 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   flex: 0 0 auto;
   font-size: 15px;
   line-height: 1;
-  min-height: 42px;
-  padding: 14px 12px 12px 24px;
+  min-height: 37px;
+  padding: 12px 12px 10px 24px;
   position: relative;
 }
 .fm-tabs button:before { display: none; }
-.fm-tabs button:after { color: rgba(244,244,244,.16); content: "●"; font-size: 11px; left: 8px; position: absolute; top: 13px; }
+.fm-tabs button:after { color: rgba(244,244,244,.16); content: "●"; font-size: 11px; left: 8px; position: absolute; top: 11px; }
 .fm-tabs button:hover { background-image: var(--tab-active-paper); color: rgb(255,248,238); }
 .fm-tabs button.active { background-color: rgb(43,43,43); background-image: var(--tab-selected-paper); border-top-color: transparent; color: rgb(255,248,238); }
 .fm-tabs button.active:after { color: var(--orange); }
@@ -1238,15 +1242,15 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   border-radius: 0 0 3px 3px;
   display: grid;
   gap: 10px;
-  grid-template-columns: 378px 1fr;
-  padding: 10px;
+  grid-template-columns: minmax(310px, 345px) 1fr;
+  padding: 8px;
 }
 .fm-tab-panel {
   background: rgb(34,34,34);
   background-image: var(--paper);
   border-radius: 0 0 3px 3px;
-  min-height: 420px;
-  padding: 16px;
+  min-height: 0;
+  padding: 12px;
 }
 .fm-card-block {
   background: rgb(43,43,43);
@@ -1487,7 +1491,7 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
 .fm-role-card span { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fm-role-card strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fm-role-card strong, .fm-role-card b { line-height: 1; }
-.fm-role-list { max-height: 208px; overflow: auto; padding-right: 4px; }
+.fm-role-list { max-height: 178px; overflow: auto; padding-right: 4px; }
 .profile-grid.compact { grid-template-columns: repeat(4, minmax(110px, 1fr)); }
 .big-score { align-items: flex-end; display: flex; gap: 9px; }
 .big-score strong { font-size: 48px; }
@@ -1513,7 +1517,7 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   background-image: var(--attribute-paper);
   border: 0;
   border-radius: 2px;
-  padding: 6px 0;
+  padding: 4px 0;
 }
 
 .attribute-group h4 {
@@ -1521,7 +1525,7 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   border-bottom: 0;
   color: var(--orange-2);
   font-family: "GT FM", "Proxima FM", Arial, sans-serif;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1;
   margin: 0;
   text-transform: uppercase;
@@ -1533,34 +1537,34 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   display: grid;
   column-gap: 8px;
   grid-template-columns: minmax(0, 1fr) 28px;
-  min-height: 28px;
-  padding: 0 10px;
+  min-height: 25px;
+  padding: 0 9px;
 }
 
 .attribute-row:last-child { border-bottom: 0; }
 .attribute-row:nth-child(even) { background: rgba(54,54,54,.34); background-image: var(--row-paper); border-radius: 2px; }
-.attribute-row span { color: rgb(255,248,238); font-size: 14px; line-height: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.attribute-row strong { font-size: 16px; font-weight: 800; line-height: 1; text-align: right; }
+.attribute-row span { color: rgb(255,248,238); font-size: 13px; line-height: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attribute-row strong { font-size: 15px; font-weight: 800; line-height: 1; text-align: right; }
 .attribute-row.important span:after { color: var(--orange); content: " *"; font-weight: 800; }
 .fm-attributes { margin: 0; padding: 0; }
 .fm-attributes .attribute-group { padding: 0; }
-.fm-attributes .attribute-group h4 { padding: 0 10px 7px; }
+.fm-attributes .attribute-group h4 { padding: 0 9px 6px; }
 .fm-bottom-panels {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   grid-template-columns: 1fr 1.2fr 1.4fr;
-  margin-top: 10px;
+  margin-top: 8px;
 }
 .fm-bottom-panels > div {
   background: rgb(34,34,34);
   background-image: var(--paper);
   border: 1px solid rgba(255,255,255,.07);
   border-radius: 2px;
-  min-height: 104px;
-  padding: 12px;
+  min-height: 96px;
+  padding: 10px;
 }
 .fm-bottom-panels h3 {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 .fm-bottom-panels .breakdown { grid-template-columns: repeat(2, minmax(110px, 1fr)); margin: 0; }
 .fm-bottom-panels strong, .fm-bottom-panels p { font-size: 13px; line-height: 1.35; }
@@ -1571,7 +1575,7 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
 .strength-list,
 .scoring-notes ul {
   display: grid;
-  gap: 6px;
+  gap: 5px;
   list-style: none;
   margin: 0;
   padding: 0;
@@ -1584,7 +1588,7 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   color: rgb(255,248,238);
   font-size: 13px;
   line-height: 1.25;
-  padding: 7px 8px;
+  padding: 6px 8px;
 }
 .strength-list li:before {
   color: var(--orange-2);
@@ -1594,12 +1598,12 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
 }
 .scoring-notes {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 .scoring-notes > div {
   background: rgba(25,25,25,.34);
   border-radius: 2px;
-  padding: 8px;
+  padding: 7px 8px;
 }
 .scoring-notes span {
   color: var(--orange-2);
@@ -1619,7 +1623,7 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   color: rgba(255,248,238,.84);
 }
 
-.role-bar { align-items: center; display: grid; gap: 8px; grid-template-columns: minmax(118px, 1fr) minmax(0, 1fr) 38px; min-height: 25px; margin: 4px 0; }
+.role-bar { align-items: center; display: grid; gap: 8px; grid-template-columns: minmax(118px, 1fr) minmax(0, 1fr) 38px; min-height: 23px; margin: 3px 0; }
 .role-bar span { color: rgb(255,248,238); font-size: 12px; line-height: 1.15; overflow: hidden; text-overflow: ellipsis; white-space: normal; }
 .role-bar strong { font-size: 12px; line-height: 1; text-align: right; }
 .role-bar i { background: rgb(25,25,25); border-radius: 0; height: 6px; overflow: hidden; }
