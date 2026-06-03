@@ -55,12 +55,12 @@
   --yellow: rgb(244,188,0);
   --red: rgb(183,0,5);
   --blue: rgb(104,120,136);
-  --paper: url("/skin/boxes/bordered-subtle.png");
-  --attribute-paper: url("/skin/boxes/attributes.png");
-  --row-paper: url("/skin/fme/alternate.png");
-  --tab-paper: url("/skin/tabs/button.png");
-  --tab-active-paper: url("/skin/tabs/button_showing.png");
-  --tab-selected-paper: url("/skin/tabs/button_selected.png");
+  --paper: linear-gradient(145deg, rgba(255,255,255,.035), rgba(0,0,0,.16));
+  --attribute-paper: linear-gradient(180deg, rgba(255,255,255,.035), rgba(0,0,0,.08));
+  --row-paper: linear-gradient(90deg, rgba(255,255,255,.04), rgba(255,255,255,.012));
+  --tab-paper: linear-gradient(180deg, rgba(255,255,255,.05), rgba(0,0,0,.16));
+  --tab-active-paper: linear-gradient(180deg, rgba(255,165,40,.18), rgba(0,0,0,.12));
+  --tab-selected-paper: linear-gradient(180deg, rgba(255,165,40,.28), rgba(255,165,40,.10));
 }
 
 * { box-sizing: border-box; }
@@ -798,7 +798,7 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
 }
 
 .attribute-group h4 {
-  background: transparent;
+  background: rgba(255,165,40,.08);
   border-bottom: 0;
   color: var(--orange-2);
   font-family: "GT FM", "Proxima FM", Arial, sans-serif;
