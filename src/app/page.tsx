@@ -13,7 +13,7 @@ type Tab = "tactic" | "rankings" | "import" | "validation" | "compare" | "instru
 type SortKey = "roleScore" | "recruitmentScore" | "confidenceScore" | "attribute" | "stats" | "hidden" | "position" | "value" | "age" | "minutes" | "averageRating";
 type SuitabilityFilter = "role-position" | "conversion" | "all";
 type PositionFilter = "" | "GK" | "DL" | "DC" | "DR" | "WBL" | "WBR" | "DM" | "ML" | "MC" | "MR" | "AML" | "AMC" | "AMR" | "ST";
-const APP_VERSION = "v0.2.10-import-layout";
+const APP_VERSION = "v0.2.11-settings-validation";
 const fmt = (value?: number, dp = 1) => value === undefined ? "-" : value.toFixed(dp);
 const scoreClass = (value?: number) => value === undefined ? "" : value >= 80 ? "elite" : value >= 65 ? "good" : value >= 50 ? "okay" : "low";
 const compactMoney = (value?: number) => {
@@ -184,7 +184,7 @@ export default function Home() {
     setBusy(true); setError(""); setProgress({ message: "Preparing upload", percent: 0 });
     try {
       const imported = await importFMFiles(files, (message, percent) => setProgress({ message, percent }));
-      const scored = scorePlayers(imported.players); setPlayers(scored); setReport(imported.report); setTab("validation");
+      const scored = scorePlayers(imported.players); setPlayers(scored); setReport(imported.report); setTab("settings");
     } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
     finally { setBusy(false); }
   }
@@ -207,7 +207,7 @@ export default function Home() {
 
   return <main className="shell">
     <header className="hero"><div><span className="eyebrow">FM24 recruitment</span><h1>FM Recruitment Lab</h1><p>Private browser-side scouting from uploaded FM HTML exports. Your file stays on this device.</p></div><div className="hero-stat"><strong>{players.length.toLocaleString()}</strong><span>players loaded</span></div></header>
-    <nav><div className="brand-title"><span>Brewerlabs</span> <b>FM</b> <span>Lab</span></div>{(["tactic", "rankings", "import", "validation", "compare", "instructions", "settings"] as Tab[]).map((value) => <button key={value} className={tab === value ? "active" : ""} onClick={() => setTab(value)}>{value}{value === "compare" ? ` (${compareIds.length})` : ""}</button>)}{players.length > 0 && <button className="clear" onClick={clearData}>Clear local data</button>}</nav>
+    <nav><div className="brand-title"><span>Brewerlabs</span> <b>FM</b> <span>Lab</span></div>{(["tactic", "rankings", "import", "compare", "instructions", "settings"] as Tab[]).map((value) => <button key={value} className={tab === value ? "active" : ""} onClick={() => setTab(value)}>{value}{value === "compare" ? ` (${compareIds.length})` : ""}</button>)}{players.length > 0 && <button className="clear" onClick={clearData}>Clear local data</button>}</nav>
     {error && <div className="notice error">{error}</div>}
 
     {tab === "import" && <section className="panel import-panel"><div className="import-hero"><div><span className="eyebrow">Data centre</span><h2>Load recruitment database</h2><p>Use the saved player pool or upload fresh FM24 HTML exports. Everything is parsed and scored in this browser.</p></div><div className="import-loaded"><strong>{players.length.toLocaleString()}</strong><span>players ready</span></div></div>
@@ -226,7 +226,7 @@ export default function Home() {
       <RankTable players={rankings.slice(0, 500)} total={rankings.length} scores={rankingScores} compareIds={compareIds} sort={sort} onOpen={setSelected} onCompare={toggleCompare} /></section>}
     {tab === "compare" && <Comparison players={compared} roleId={roleId} onExport={() => exportCSV("fm-recruitment-comparison.csv", compared)} />}
     {tab === "instructions" && <Instructions />}
-    {tab === "settings" && <Settings onExport={() => exportCSV("fm-recruitment-full-scored-dataset.csv", players)} />}
+    {tab === "settings" && <Settings report={report} onTactic={() => setTab("tactic")} onExport={() => exportCSV("fm-recruitment-full-scored-dataset.csv", players)} />}
     {selected && <PlayerModal player={selected} slot={slot} roleId={roleId} onClose={() => setSelected(null)} />}
     <div className="app-version">{APP_VERSION}</div>
   </main>;
@@ -234,9 +234,12 @@ export default function Home() {
 
 function Validation({ report, onTactic }: { report: ValidationReport | null; onTactic: () => void }) {
   if (!report) return <section className="panel empty">Upload an FM HTML file to generate a validation report.</section>;
-  return <section className="panel validation"><span className="eyebrow">Import complete</span><h2>Data validation report</h2><div className="report-grid">{report.messages.map((message) => <div key={message}><strong>{message}</strong></div>)}</div>
+  return <section className="panel validation"><ValidationSummary report={report} onTactic={onTactic} /></section>;
+}
+function ValidationSummary({ report, onTactic }: { report: ValidationReport; onTactic: () => void }) {
+  return <><span className="eyebrow">Import complete</span><h2>Data validation report</h2><div className="report-grid">{report.messages.map((message) => <div key={message}><strong>{message}</strong></div>)}</div>
     <h3>Files</h3><p>{report.files.join(", ")}</p><h3>Missing useful columns</h3><p>{report.missingUseful.length ? report.missingUseful.join(", ") : "None. Excellent export coverage."}</p>
-    <details><summary>Detected columns ({report.detectedColumns.length})</summary><p>{report.detectedColumns.join(", ")}</p></details><button className="primary" onClick={onTactic}>Open role board</button></section>;
+    <details><summary>Detected columns ({report.detectedColumns.length})</summary><p>{report.detectedColumns.join(", ")}</p></details><button className="primary" onClick={onTactic}>Open role board</button></>;
 }
 function Tactic({ onSelect }: { onSelect: (slot: SlotId, role: RoleId) => void }) {
   return <section className="panel tactic-wrap"><div><span className="eyebrow">Role map</span><h2>Balanced FM24 roles</h2><p>Click a position to open its live rankings.</p></div><div className="pitch">{TACTIC_SLOTS.map((item) => <button key={item.id} className="position" style={{ left: `${item.x}%`, top: `${item.y}%` }} onClick={() => onSelect(item.id, item.roleId)}><strong>{item.id}</strong><span>{roleDisplayName(ROLE_CONFIG[item.roleId])}</span></button>)}</div></section>;
@@ -264,8 +267,8 @@ function Comparison({ players, roleId, onExport }: { players: ScoredPlayer[]; ro
       <div className="compare-section"><h3>Role flexibility</h3><div className="table-scroll"><table className="compare-role-table"><thead><tr><th>Role</th>{players.map((player) => <th key={player.id}>{player.name}</th>)}</tr></thead><tbody>{roles.map((role) => <tr key={role}><td>{roleDisplayName(ROLE_CONFIG[role])}</td>{players.map((player) => { const value = player.scores[role].roleScore; return <td key={player.id} className={scoreClass(value)}><span className="role-chip-score">{fmt(value)}</span></td>; })}</tr>)}</tbody></table></div></div>
     </>}</section>;
 }
-function Settings({ onExport }: { onExport: () => void }) {
-  return <section className="panel settings"><span className="eyebrow">Scoring transparency</span><h2>{PRESET_VERSION}</h2><p>Role Score is pure role fit: 70% attributes, 15% position/foot, 10% hidden/profile and 5% shrunken stats. Recruitment Score adds market value, wage and age/development.</p><button onClick={onExport}>Export full scored dataset CSV</button>{Object.values(ROLE_CONFIG).map((role) => <details key={role.id}><summary><strong>{roleDisplayName(role)}</strong></summary><p><b>Attribute weights:</b> {Object.entries(role.attributeWeights).map(([key, weight]) => `${key} ${weight}`).join(", ")}</p><p><b>Positive stats:</b> {Object.entries(role.positiveStatWeights).map(([key, weight]) => `${key} ${weight}`).join(", ")}</p><p><b>Floor penalties:</b> {role.floorPenalties.map((p) => `${p.attribute}<${p.lt}: -${p.minus}`).join(", ") || "None"}</p></details>)}</section>;
+function Settings({ report, onTactic, onExport }: { report: ValidationReport | null; onTactic: () => void; onExport: () => void }) {
+  return <section className="panel settings"><span className="eyebrow">Scoring transparency</span><h2>{PRESET_VERSION}</h2><p>Role Score is pure role fit: 70% attributes, 15% position/foot, 10% hidden/profile and 5% shrunken stats. Recruitment Score adds market value, wage and age/development.</p><button onClick={onExport}>Export full scored dataset CSV</button>{report && <details open><summary><strong>Data validation report</strong></summary><ValidationSummary report={report} onTactic={onTactic} /></details>}{Object.values(ROLE_CONFIG).map((role) => <details key={role.id}><summary><strong>{roleDisplayName(role)}</strong></summary><p><b>Attribute weights:</b> {Object.entries(role.attributeWeights).map(([key, weight]) => `${key} ${weight}`).join(", ")}</p><p><b>Positive stats:</b> {Object.entries(role.positiveStatWeights).map(([key, weight]) => `${key} ${weight}`).join(", ")}</p><p><b>Floor penalties:</b> {role.floorPenalties.map((p) => `${p.attribute}<${p.lt}: -${p.minus}`).join(", ") || "None"}</p></details>)}</section>;
 }
 function Instructions() {
   const exportColumns = ["Name", "Age", "DOB", "UID", "Club", "Nation", "Position", "Preferred Foot", "Left Foot", "Right Foot", "Height", "Transfer Value", "Wage", "Minutes", "Av Rat", "all visible attributes", "relevant per-90 stats"];
