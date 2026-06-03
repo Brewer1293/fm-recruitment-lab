@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { exportCSV, exportHTML } from "../lib/exports";
-import { clubLogoUrl, nationLogoUrl, playerFaceUrl, resolveClubUid, resolveNationUid } from "../lib/assetResolver";
+import { clubLogoUrl, nationLogoUrl, playerFaceUrl } from "../lib/assetResolver";
 import { importFMFiles } from "../lib/fmParser";
 import { PRESET_VERSION, ROLE_CONFIG, TACTIC_SLOTS } from "../lib/roleConfig";
 import { scoreForSlot, scorePlayers } from "../lib/scoring";
@@ -73,6 +73,16 @@ const field = (player: ScoredPlayer, ...keys: string[]) => {
     if ((typeof value === "string" || typeof value === "number") && value !== "") return value;
   }
   return undefined;
+};
+const dobLine = (player: ScoredPlayer) => {
+  const dob = field(player, "dob", "dateOfBirth");
+  return dob ? `${dob}${player.age !== undefined ? ` (${fmt(player.age, 0)} years old)` : ""}` : player.age !== undefined ? `${fmt(player.age, 0)} years old` : "-";
+};
+const capsLine = (player: ScoredPlayer) => {
+  const caps = field(player, "internationalCaps", "caps");
+  const goals = field(player, "internationalGoals", "intGoals");
+  if (caps === undefined && goals === undefined) return "";
+  return `${caps ?? 0} caps / ${goals ?? 0} goals`;
 };
 const statValue = (player: ScoredPlayer, key: string, dp = 2, suffix = "") => typeof player[key] === "number" ? `${(player[key] as number).toFixed(dp)}${suffix}` : "-";
 const POSITION_CODE_CACHE = new Map<string, Set<string>>();
@@ -195,9 +205,7 @@ function PlayerModal({ player, roleId, slot, onClose }: { player: ScoredPlayer; 
   const [profileTab, setProfileTab] = useState<ModalTab>("Attributes");
   const active = scoreForSlot(player, roleId, slot), role = ROLE_CONFIG[roleId];
   const roleWeights = new Set(Object.keys(role.attributeWeights).filter((key) => role.attributeWeights[key] >= 7));
-  const bestRole = Object.values(ROLE_CONFIG).map((candidate) => ({ role: candidate, score: player.scores[candidate.id].roleScore })).sort((a, b) => b.score - a.score)[0];
   const faceUrl = playerFaceUrl(player), clubUrl = clubLogoUrl(player), nationUrl = nationLogoUrl(player);
-  const clubUid = resolveClubUid(player), nationUid = resolveNationUid(player.nationality);
   return <div className="backdrop" onClick={onClose}><aside className="modal fm-profile-modal" onClick={(e) => e.stopPropagation()}><button className="modal-close" onClick={onClose}>×</button>
     <section className="fm-profile-top">
       <div className="fm-player-card">
@@ -206,7 +214,7 @@ function PlayerModal({ player, roleId, slot, onClose }: { player: ScoredPlayer; 
         <div className="profile-status-chip">Int</div>
         <div className="profile-name-strip"><strong>{player.name}</strong><span>Role {fmt(active.roleScore)} · Recruitment {fmt(active.recruitmentScore)} · Confidence {fmt(active.confidenceScore)}</span></div>
       </div>
-      <div className="fm-info-card"><ProfileLine label="Nationality" value={player.nationality ?? "-"} splitLabel="Nation UID" splitValue={nationUid ?? "-"} /><ProfileLine label="Position" value={player.position ?? "-"} /><ProfileLine label="Age" value={player.age ?? "-"} splitLabel="Height" splitValue={height(player.height)} /><ProfileLine label="Wage" value={compactWage(player.wageK)} splitLabel="Value" splitValue={money(player)} /><ProfileLine label="Role" value={`${slot} · ${role.shortName}`} splitLabel="Best role" splitValue={`${bestRole.role.shortName} ${fmt(bestRole.score)}`} /><ProfileLine label="Minutes" value={fmt(player.minutes, 0)} splitLabel="Club UID" splitValue={clubUid ?? "-"} /></div>
+      <TopInfoCard player={player} />
     </section>
     <div className="fm-tabs">{modalTabs.map((label) => <button className={profileTab === label ? "active" : ""} key={label} type="button" onClick={() => setProfileTab(label)}>{label}</button>)}</div>
     {profileTab === "Attributes" ? <><section className="fm-profile-body">
@@ -260,7 +268,17 @@ function statRows(player: ScoredPlayer) {
 function ScorePill({ label, value }: { label: string; value: number }) {
   return <div className="score-pill"><span>{label}</span><strong className={scoreClass(value)}>{fmt(value)}</strong></div>;
 }
-function ProfileLine({ label, value, splitLabel, splitValue }: { label: string; value: string | number; splitLabel?: string; splitValue?: string | number }) {
-  return <div className="profile-line"><span>{label}</span><strong>{value}</strong>{splitLabel && <><span>{splitLabel}</span><strong>{splitValue}</strong></>}</div>;
+function TopInfoCard({ player }: { player: ScoredPlayer }) {
+  const nationUrl = nationLogoUrl(player), caps = capsLine(player);
+  const condition = field(player, "condition", "fitness"), sharpness = field(player, "sharpness", "matchSharpness");
+  const morale = field(player, "morale");
+  return <div className="fm-info-card top-info-card">
+    <div className="top-info-row full nationality-row"><span>Nationality</span><strong><span className="top-main-value">{player.nationality ?? "-"}<span className="mini-flag"><AssetImage src={nationUrl} alt={`${player.nationality ?? "Nation"} flag`} fallback="" /></span></span>{caps && <small>{caps}</small>}</strong></div>
+    <div className="top-info-row full"><span>D.O.B.</span><strong>{dobLine(player)}</strong></div>
+    <div className="top-info-row split"><span>Wage</span><strong>{compactWage(player.wageK)}</strong><span>Value</span><strong>{money(player)}</strong></div>
+    <div className="top-info-row split"><span>Ability</span><strong>Unknown</strong><span>Potential</span><strong>Unknown</strong></div>
+    <div className="top-info-row split"><span>Morale</span><strong className="icon-value">{morale ?? "▲"}</strong><span>Av Rat</span><strong className="green">{fmt(player.averageRating, 2)}</strong></div>
+    <div className="top-info-row split"><span>Condition</span><strong className="icon-value">{condition ?? "♡"}</strong><span>Sharpness</span><strong className="icon-value">{sharpness ?? "◔"}</strong></div>
+  </div>;
 }
 function Breakdown({ score }: { score: RoleScore }) { const parts: [string, RoleScore[keyof Pick<RoleScore, "attribute" | "stats" | "hidden" | "position" | "value">]][] = [["Attributes", score.attribute], ["Adjusted Stats", score.stats], ["Hidden/Profile", score.hidden], ["Position/Foot", score.position], ["Value", score.value]]; return <div className="breakdown">{parts.map(([label, item]) => <div key={label}><span>{label}</span><strong>{fmt(item.score)}</strong><small>{item.available}/{item.expected} inputs</small></div>)}</div>; }

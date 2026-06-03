@@ -1,13 +1,14 @@
 import type { NormalizedPlayer, RawPlayer, ValidationReport } from "./types";
 
 const ALIASES: Record<string, string[]> = {
-  name: ["name"], age: ["age"], club: ["club", "team"], nationality: ["nat", "nationality"], secondNationality: ["2nd nat", "second nationality"],
+  name: ["name"], age: ["age"], dob: ["dob", "date of birth"], club: ["club", "team"], nationality: ["nat", "nationality"], secondNationality: ["2nd nat", "second nationality"],
+  internationalCaps: ["caps", "international caps"], internationalGoals: ["int goals", "international goals"],
   based: ["based"], basedIn: ["based in"], division: ["division"],
   position: ["position", "pos"], personality: ["personality"], mediaDescription: ["media description"], mediaHandling: ["media handling"],
   preferredFoot: ["preferred foot"], leftFoot: ["left foot"], rightFoot: ["right foot"],
   contractType: ["contract type", "type"], contractStarted: ["contract started", "started"], contractExpires: ["contract expires", "expires"],
   playingTime: ["playing time", "agreed playing time", "actual playing time"], injury: ["injury"], injuryRisk: ["injury risk"],
-  fatigue: ["fatigue"], morale: ["morale"], condition: ["condition", "con"], fitness: ["fitness"],
+  fatigue: ["fatigue"], morale: ["morale"], condition: ["condition", "con"], fitness: ["fitness"], sharpness: ["sharpness", "match sharpness", "shp"],
   height: ["height"], valueM: ["transfer value", "value"], wageK: ["wage"], minutes: ["mins", "minutes"],
   averageRating: ["av rat", "average rating"], uid: ["uid"],
   acc: ["acc"], pac: ["pac"], sta: ["sta"], wor: ["wor"], cro: ["cro"], dri: ["dri", "drb"],
@@ -27,7 +28,7 @@ const ALIASES: Record<string, string[]> = {
   conceded90: ["con/90", "goals conceded/90"], conversionPercentage: ["conv %", "conversion %"], progressivePasses90: ["pr passes/90", "progressive passes/90"],
   longPassCompletion: ["long pass %", "long passes %"], errorsLeadingToGoal90: ["errors/90", "err/90", "errors leading to goal/90"],
 };
-const TEXT_FIELDS = ["name", "club", "nationality", "secondNationality", "based", "basedIn", "division", "position", "personality", "mediaDescription", "mediaHandling", "preferredFoot", "leftFoot", "rightFoot", "contractType", "contractStarted", "contractExpires", "playingTime", "injury", "injuryRisk", "fatigue", "morale", "height", "uid"];
+const TEXT_FIELDS = ["name", "dob", "club", "nationality", "secondNationality", "based", "basedIn", "division", "position", "personality", "mediaDescription", "mediaHandling", "preferredFoot", "leftFoot", "rightFoot", "contractType", "contractStarted", "contractExpires", "playingTime", "injury", "injuryRisk", "fatigue", "morale", "height", "uid"];
 const NUMERIC = new Set(Object.keys(ALIASES).filter((key) => !TEXT_FIELDS.includes(key)));
 const REQUIRED = ["name", "position"];
 const USEFUL = ["age", "club", "nationality", "basedIn", "division", "uid", "valueM", "wageK", "minutes", "averageRating", "preferredFoot", "leftFoot", "rightFoot"];
