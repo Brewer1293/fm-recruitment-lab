@@ -151,7 +151,7 @@ nav {
 nav:before {
   background: url("/skin/icons/fm.png") left center / 26px 26px no-repeat;
   color: var(--text);
-  content: "FM LAB";
+  content: "LAB";
   font-size: 17px;
   font-weight: 800;
   left: 18px;
