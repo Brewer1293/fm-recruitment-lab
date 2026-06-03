@@ -6,14 +6,15 @@ Update this file before each live push to the standalone FM app.
 
 ## Unreleased
 
-- Added a Settings theme picker with Classic Orange, Cool Blue and Emerald Green accent themes.
-- Moved player profile ranking navigation so it no longer overlaps the close button.
-- Added a Settings STAG baselines section showing which players set each role/metric benchmark.
+- No unreleased changes.
 
 ## Live History
 
 ### 2026-06-03
 
+- `754d1c5` Added a Settings STAG baselines section showing which players set each role/metric benchmark.
+- `955f31a` Moved player profile ranking navigation so it no longer overlaps the close button.
+- `665b252` Added a Settings theme picker with Classic Orange, Cool Blue and Emerald Green accent themes.
 - Split FM Recruitment Lab into its own standalone GitHub repository and Cloudflare Pages deployment path.
 - Added player profile ranking navigation with up/down controls and keyboard arrows.
 - Improved Scouting filter readability.
