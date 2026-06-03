@@ -323,15 +323,15 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   box-shadow: 0 28px 90px rgba(0, 0, 0, 0.72);
   height: min(92vh, 1010px);
   overflow: auto;
-  padding: 8px;
+  padding: 10px;
   width: min(1040px, calc(100vw - 28px));
 }
 
 .modal-close {
   float: right;
-  font-size: 20px;
-  height: 34px;
-  min-width: 34px;
+  font-size: 18px;
+  height: 32px;
+  min-width: 32px;
   padding: 0;
   position: relative;
   z-index: 2;
@@ -358,7 +358,7 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   grid-column: 1;
   grid-row: 1;
   justify-items: center;
-  padding: 27px 14px 14px;
+  padding: 24px 14px 14px;
 }
 .flag-tile, .club-tile {
   align-items: center;
@@ -417,7 +417,7 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   grid-column: 1 / -1;
   grid-row: 2;
   justify-items: center;
-  padding: 7px 12px;
+  padding: 8px 12px 7px;
   text-align: center;
 }
 .profile-name-strip strong {
@@ -429,7 +429,7 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
 .profile-name-strip span {
   color: rgba(255,255,255,.72);
   font-size: 10px;
-  margin-top: 3px;
+  margin-top: 2px;
 }
 .fm-info-card {
   background: rgba(34,34,34,.94);
@@ -438,21 +438,21 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   display: grid;
   gap: 0;
   overflow: hidden;
-  padding: 12px 10px;
+  padding: 10px;
 }
 .profile-line {
   align-items: center;
   background: transparent;
   border-radius: 0;
   display: grid;
-  gap: 12px;
-  grid-template-columns: 130px minmax(0, 1fr) 86px minmax(0, 1fr);
+  column-gap: 12px;
+  grid-template-columns: 124px minmax(0, 1fr) 82px minmax(0, 1fr);
   min-height: 43px;
-  padding: 0 10px;
+  padding: 0 12px;
 }
 .profile-line:nth-child(even) { background: rgba(54,54,54,.34); background-image: none; border-radius: 7px; }
-.profile-line span { color: rgba(244,244,244,.58); font-size: 17px; text-transform: none; }
-.profile-line strong { color: rgb(255,248,238); font-size: 16px; font-weight: 600; overflow-wrap: anywhere; text-align: right; }
+.profile-line span { color: rgba(244,244,244,.58); font-size: 15px; line-height: 1; text-transform: none; }
+.profile-line strong { color: rgb(255,248,238); font-size: 15px; font-weight: 600; line-height: 1.1; overflow-wrap: anywhere; text-align: right; }
 .fm-tabs {
   background: rgba(34,34,34,.94);
   border: 0;
@@ -468,15 +468,16 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   border-top: 0;
   color: rgba(244,244,244,.6);
   flex: 0 0 auto;
-  font-size: 16px;
+  font-size: 15px;
   background-image: none;
-  min-height: 44px;
-  padding: 12px 12px;
+  line-height: 1;
+  min-height: 42px;
+  padding: 14px 12px 12px 24px;
   position: relative;
 }
 .fm-tabs span:before { display: none; }
-.fm-tabs span:after { color: rgba(244,244,244,.16); content: "●"; font-size: 12px; left: 7px; position: absolute; top: 15px; }
-.fm-tabs span.active { background-color: transparent; background-image: none; border-top-color: transparent; color: rgb(255,248,238); padding-left: 30px; }
+.fm-tabs span:after { color: rgba(244,244,244,.16); content: "●"; font-size: 11px; left: 8px; position: absolute; top: 13px; }
+.fm-tabs span.active { background-color: transparent; background-image: none; border-top-color: transparent; color: rgb(255,248,238); }
 .fm-tabs span.active:after { color: var(--orange); }
 .fm-profile-body {
   background: rgba(34,34,34,.94);
@@ -488,10 +489,11 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   grid-template-columns: 378px 1fr;
   padding: 10px;
 }
-.fm-position-panel { display: grid; align-content: start; gap: 14px; }
+.fm-position-panel { display: grid; align-content: start; gap: 12px; }
 .fm-position-panel h3, .fm-bottom-panels h3 {
   color: var(--orange-2);
-  font-size: 15px;
+  font-size: 14px;
+  line-height: 1;
   margin: 0;
   text-transform: uppercase;
 }
@@ -536,11 +538,13 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   border: 0;
   border-radius: 7px;
   display: grid;
-  gap: 6px;
-  grid-template-columns: 74px 1fr 46px;
-  padding: 9px;
+  gap: 8px;
+  grid-template-columns: 70px minmax(0, 1fr) 44px;
+  min-height: 36px;
+  padding: 7px 10px;
 }
-.fm-role-card span { color: var(--muted); }
+.fm-role-card span { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fm-role-card strong, .fm-role-card b { line-height: 1; }
 .fm-role-list { max-height: 208px; overflow: auto; padding-right: 4px; }
 .profile-grid.compact { grid-template-columns: repeat(4, minmax(110px, 1fr)); }
 .big-score { align-items: flex-end; display: flex; gap: 9px; }
@@ -558,7 +562,7 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
 .attribute-groups {
   align-items: start;
   display: grid;
-  gap: 0;
+  column-gap: 10px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
@@ -567,14 +571,15 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   background-image: none;
   border: 0;
   border-radius: 0;
-  padding: 10px;
+  padding: 0;
 }
 
 .attribute-group h4 {
   background: transparent;
   border-bottom: 0;
   color: var(--orange-2);
-  font-size: 15px;
+  font-size: 14px;
+  line-height: 1;
   margin: 0;
   text-transform: uppercase;
 }
@@ -583,39 +588,40 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   align-items: center;
   border-bottom: 1px solid rgba(0, 0, 0, 0.15);
   display: grid;
-  gap: 8px;
-  grid-template-columns: 1fr 34px;
+  column-gap: 8px;
+  grid-template-columns: minmax(0, 1fr) 28px;
   min-height: 27px;
   padding: 0 10px;
 }
 
 .attribute-row:last-child { border-bottom: 0; }
 .attribute-row:nth-child(even) { background: rgba(54,54,54,.34); background-image: none; border-radius: 7px; }
-.attribute-row span { color: rgb(255,248,238); font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.attribute-row strong { font-size: 16px; text-align: right; }
+.attribute-row span { color: rgb(255,248,238); font-size: 14px; line-height: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attribute-row strong { font-size: 16px; line-height: 1; text-align: right; }
 .attribute-row.important span:after { color: var(--orange); content: " *"; font-weight: 800; }
 .fm-attributes { margin: 0; padding: 0; }
 .fm-attributes .attribute-group { padding: 0; }
 .fm-attributes .attribute-group h4 { padding: 0 10px 7px; }
 .fm-bottom-panels {
   display: grid;
-  gap: 8px;
+  gap: 10px;
   grid-template-columns: 1fr 1.2fr 1.4fr;
-  margin-top: 8px;
+  margin-top: 10px;
 }
 .fm-bottom-panels > div {
   background: rgb(34,34,34);
   background-image: var(--paper);
   border: 1px solid rgba(255,255,255,.07);
-  border-radius: 3px;
-  min-height: 112px;
-  padding: 14px;
+  border-radius: 8px;
+  min-height: 104px;
+  padding: 12px;
 }
 .fm-bottom-panels .breakdown { grid-template-columns: repeat(2, minmax(110px, 1fr)); margin: 0; }
+.fm-bottom-panels strong, .fm-bottom-panels p { font-size: 13px; line-height: 1.35; }
 
-.role-bar { align-items: center; display: grid; gap: 8px; grid-template-columns: 55px 1fr 40px; margin: 7px 0; }
-.role-bar span { color: rgb(255,248,238); font-size: 12px; }
-.role-bar strong { font-size: 13px; text-align: right; }
+.role-bar { align-items: center; display: grid; gap: 8px; grid-template-columns: 56px minmax(0, 1fr) 38px; min-height: 25px; margin: 4px 0; }
+.role-bar span { color: rgb(255,248,238); font-size: 12px; line-height: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.role-bar strong { font-size: 12px; line-height: 1; text-align: right; }
 .role-bar i { background: rgb(25,25,25); border-radius: 0; height: 6px; overflow: hidden; }
 .role-bar b { background: currentColor; display: block; height: 100%; }
 code { color: var(--orange-2); }
@@ -640,7 +646,7 @@ code { color: var(--orange-2); }
   .profile-line span { font-size: 14px; }
   .profile-line strong { font-size: 14px; text-align: left; }
   .profile-line { grid-template-columns: 1fr; }
-  .fm-tabs span { font-size: 14px; min-height: 40px; padding: 11px 12px; }
+  .fm-tabs span { font-size: 14px; min-height: 40px; padding: 13px 12px 11px 24px; }
   .fm-tabs span:after { top: 13px; }
   .skin-pitch { min-width: 0; }
   .attribute-row span { font-size: 14px; }
