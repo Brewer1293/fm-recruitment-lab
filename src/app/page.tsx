@@ -13,7 +13,7 @@ type Tab = "tactic" | "rankings" | "import" | "validation" | "compare" | "instru
 type SortKey = "roleScore" | "recruitmentScore" | "confidenceScore" | "attribute" | "stats" | "hidden" | "position" | "value" | "age" | "minutes" | "averageRating";
 type SuitabilityFilter = "role-position" | "conversion" | "all";
 type PositionFilter = "" | "GK" | "DL" | "DC" | "DR" | "WBL" | "WBR" | "DM" | "ML" | "MC" | "MR" | "AML" | "AMC" | "AMR" | "ST";
-const APP_VERSION = "v0.2.15-tactic-layout";
+const APP_VERSION = "v0.2.16-stag-minutes";
 const fmt = (value?: number, dp = 1) => value === undefined ? "-" : value.toFixed(dp);
 const scoreClass = (value?: number) => value === undefined ? "" : value >= 80 ? "elite" : value >= 65 ? "good" : value >= 50 ? "okay" : "low";
 const compactMoney = (value?: number) => {
@@ -312,7 +312,7 @@ function PlayerModal({ player, roleId, slot, onClose }: { player: ScoredPlayer; 
         <div className="profile-logo-stack"><div className="flag-tile"><AssetImage src={nationUrl} alt={`${player.nationality ?? "Nation"} logo`} fallback="" /></div><div className="club-tile"><AssetImage src={clubUrl} alt={`${player.club ?? "Club"} logo`} fallback="" /></div></div>
         <div className="profile-photo-slot"><AssetImage src={faceUrl} alt={`${player.name} face`} fallback="" /></div>
         <div className="profile-status-chip">Int</div>
-        <div className="profile-name-strip"><strong>{player.name}</strong><span>Role {fmt(active.roleScore)} · Recruitment {fmt(active.recruitmentScore)} · Confidence {fmt(active.confidenceScore)}</span></div>
+        <div className="profile-name-strip"><strong>{player.name}</strong></div>
       </div>
       <TopInfoCard player={player} />
     </section>
@@ -406,7 +406,7 @@ function StagStats({ player, activeSlot }: { player: ScoredPlayer; activeSlot: S
   });
   const rows = [...positiveRows, ...penaltyRows];
   return <section className="fm-tab-panel stats-tab"><div className="fm-role-tabs tactic-stag-tabs">{TACTIC_SLOTS.map((item) => <button key={item.id} type="button" className={selectedSlot === item.id ? "active" : ""} onClick={() => setSelectedSlot(item.id)} title={roleDisplayName(ROLE_CONFIG[item.roleId])}><strong>{item.id}</strong><span>{roleAbbreviation(ROLE_CONFIG[item.roleId])}</span></button>)}</div>
-    <div className="stag-summary"><ScorePill label="Raw STAG" value={score.rawStats} /><ScorePill label="Adjusted STAG" value={score.stats.score ?? 50} /><ScorePill label="Minutes confidence" value={confidence * 100} /><ScorePill label="Inputs" value={(score.stats.available / Math.max(score.stats.expected, 1)) * 100} /></div>
+    <div className="stag-summary"><ScorePill label="Minutes" value={Number(player.minutes ?? 0)} dp={0} tone={false} /><ScorePill label="Raw STAG" value={score.rawStats} /><ScorePill label="Adjusted STAG" value={score.stats.score ?? 50} /><ScorePill label="Minutes confidence" value={confidence * 100} /><ScorePill label="Inputs" value={(score.stats.available / Math.max(score.stats.expected, 1)) * 100} /></div>
     <h3>{tacticSlot.id} · {roleDisplayName(role)} performance model</h3>
     <table className="fm-stat-table stag-compare-table"><thead><tr><th>Metric</th><th>Weight</th><th>Player</th><th>Low</th><th>Medium</th><th>High</th><th>Elite</th><th>Tier</th><th>Next step</th><th>Score impact</th></tr></thead><tbody>{rows.map((row) => {
       const thresholds = row.metric ? tierThresholds(row.metric, row.type) : [], favourableLabel = row.type === "penalty" ? "Lower is better" : "Higher is better";
@@ -416,8 +416,8 @@ function StagStats({ player, activeSlot }: { player: ScoredPlayer; activeSlot: S
     <p className="muted-tab-note">Tiers are derived from the role target used by the scoring model. Positive metrics climb from Low to Elite; negative metrics such as errors are inverted, so lower is better. Adjusted STAG still shrinks the raw score by minutes confidence.</p>
   </section>;
 }
-function ScorePill({ label, value }: { label: string; value: number }) {
-  return <div className="score-pill"><span>{label}</span><strong className={scoreClass(value)}>{fmt(value)}</strong></div>;
+function ScorePill({ label, value, dp = 1, tone = true }: { label: string; value: number; dp?: number; tone?: boolean }) {
+  return <div className="score-pill"><span>{label}</span><strong className={tone ? scoreClass(value) : ""}>{fmt(value, dp)}</strong></div>;
 }
 function StrengthList({ items }: { items: string[] }) {
   if (!items.length) return <p className="empty-note">No standout exported attributes available.</p>;
