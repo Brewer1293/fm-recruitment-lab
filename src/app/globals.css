@@ -636,40 +636,6 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   margin: 0;
   text-transform: uppercase;
 }
-.skin-pitch {
-  aspect-ratio: 1.85;
-  background:
-    radial-gradient(circle at 50% 50%, rgba(255,255,255,.12) 0 10%, transparent 10.5%),
-    repeating-radial-gradient(circle at 50% 50%, rgba(255,255,255,.03) 0 19px, transparent 20px 39px),
-    linear-gradient(90deg, transparent 49.8%, rgba(255,255,255,.3) 50%, transparent 50.2%),
-    linear-gradient(rgba(255,255,255,.04), rgba(0,0,0,.18)),
-    rgb(43,43,43);
-  border: 2px solid rgba(255,255,255,.28);
-  position: relative;
-}
-.skin-pitch:before, .skin-pitch:after {
-  border: 2px solid rgba(255,255,255,.22);
-  content: "";
-  height: 46%;
-  position: absolute;
-  top: 27%;
-  width: 14%;
-}
-.skin-pitch:before { left: 0; }
-.skin-pitch:after { right: 0; }
-.pitch-dot {
-  background: #d4a13a;
-  border: 2px solid rgba(0,0,0,.72);
-  border-radius: 50%;
-  box-shadow: 0 0 0 2px rgba(255,255,255,.12);
-  height: 21px;
-  position: absolute;
-  width: 21px;
-}
-.dot-st { background: #90fb87; right: 11%; top: 46%; box-shadow: 0 0 0 3px #d5cb61; height: 28px; width: 28px; }
-.dot-lw { background: #90fb87; right: 28%; top: 17%; height: 25px; width: 25px; }
-.dot-rw { background: #76b95f; right: 28%; bottom: 15%; }
-.dot-cm { left: 52%; bottom: 22%; }
 .fm-role-card {
   align-items: center;
   background: rgb(43,43,43);
@@ -789,7 +755,6 @@ code { color: var(--orange-2); }
   .fm-tabs button:after { top: 13px; }
   .fm-card-block.wide { grid-column: auto; }
   .medical-tab > div { border-right: 0 !important; }
-  .skin-pitch { min-width: 0; }
   .attribute-row span { font-size: 14px; }
   .attribute-row strong { font-size: 16px; }
   .role-score-badge { text-align: left; }
