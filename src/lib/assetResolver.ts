@@ -4,6 +4,20 @@ import type { NormalizedPlayer } from "./types";
 
 const ASSET_BASE_URL = "https://assets.brewerlabs.uk";
 const logoPathsByUid = logoAssetMap as Record<string, string>;
+const clubUidEntries = clubUidMap as Record<string, string>;
+
+const clubNameAliases: Record<string, string[]> = {
+  "bayer leverkusen": ["bayer 04"],
+  leverkusen: ["bayer 04"],
+  stuttgart: ["vfb stuttgart"],
+};
+
+const uniqueClubUidByName = Object.entries(clubUidEntries).reduce<Record<string, string | undefined>>((acc, [key, uid]) => {
+  const [club] = key.split("|");
+  if (!club) return acc;
+  acc[club] = acc[club] && acc[club] !== uid ? undefined : uid;
+  return acc;
+}, {});
 
 const countryCodeAliases: Record<string, string> = {
   eng: "eng", england: "eng",
@@ -39,6 +53,7 @@ const countryCodeAliases: Record<string, string> = {
   mar: "mar", morocco: "mar",
   nga: "nga", nigeria: "nga",
   gha: "gha", ghana: "gha",
+  gui: "gui", gin: "gui", guinea: "gui",
   sen: "sen", senegal: "sen",
   cmr: "cmr", cameroon: "cmr",
   col: "col", colombia: "col",
@@ -85,6 +100,8 @@ const nationUidByKey: Record<string, string> = {
   ger: "771", germany: "771",
   gha: "21", ghana: "21",
   gre: "772", greece: "772",
+  gui: "22", gin: "22", guinea: "22",
+  gnb: "23", "guinea bissau": "23", "guinea-bissau": "23",
   hun: "773", hungary: "773",
   isl: "774", iceland: "774",
   ind: "112", india: "112",
@@ -143,13 +160,20 @@ function countryKey(value?: string) {
 export function resolveClubUid(player: Pick<NormalizedPlayer, "club" | "basedIn" | "based" | "division">) {
   if (!player.club) return undefined;
   const club = normaliseAssetKey(player.club);
+  const clubCandidates = [club, ...(clubNameAliases[club] ?? [])];
   const contexts = [
     countryKey(player.basedIn),
     countryKey(player.based),
     normaliseAssetKey(player.based).replace(/\s.*$/, ""),
   ].filter(Boolean);
-  for (const context of contexts) {
-    const uid = (clubUidMap as Record<string, string>)[`${club}|${context}`];
+  for (const clubCandidate of clubCandidates) {
+    for (const context of contexts) {
+      const uid = clubUidEntries[`${clubCandidate}|${context}`];
+      if (uid) return uid;
+    }
+  }
+  for (const clubCandidate of clubCandidates) {
+    const uid = uniqueClubUidByName[clubCandidate];
     if (uid) return uid;
   }
   return undefined;
@@ -172,12 +196,13 @@ export function clubLogoUrl(player: Pick<NormalizedPlayer, "club" | "basedIn" | 
 
 export function nationLogoUrl(player: Pick<NormalizedPlayer, "nationality">) {
   const uid = resolveNationUid(player.nationality);
-  return uid ? logoUrlFromUid(uid) : undefined;
+  return uid ? logoUrlFromUid(uid, "federation") : undefined;
 }
 
-function logoUrlFromUid(uid: string) {
+function logoUrlFromUid(uid: string, fallbackType?: "federation") {
   const path = logoPathsByUid[String(uid)];
-  return path ? `${ASSET_BASE_URL}/${encodeAssetPath(path)}` : undefined;
+  const fallback = fallbackType === "federation" ? `logos/Men/Others/Federations/TCM4_${uid}.png` : undefined;
+  return path || fallback ? `${ASSET_BASE_URL}/${encodeAssetPath(path ?? fallback!)}` : undefined;
 }
 
 function encodeAssetPath(path: string) {
