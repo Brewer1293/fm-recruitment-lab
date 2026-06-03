@@ -10,10 +10,10 @@ import { scoreForSlot, scorePlayers } from "../lib/scoring";
 import type { RoleId, RoleScore, ScoredPlayer, SlotId, ValidationReport } from "../lib/types";
 
 type Tab = "tactic" | "rankings" | "import" | "validation" | "compare" | "instructions" | "settings";
-type SortKey = "roleScore" | "recruitmentScore" | "confidenceScore" | "attribute" | "stats" | "hidden" | "position" | "value" | "age" | "minutes" | "averageRating";
+type SortKey = "roleScore" | "recruitmentScore" | "confidenceScore" | "attribute" | "stats" | "hidden" | "position" | "value" | "age" | "minutes" | "apps" | "goals" | "assists" | "averageRating";
 type SuitabilityFilter = "role-position" | "conversion" | "all";
 type PositionFilter = "" | "GK" | "DL" | "DC" | "DR" | "WBL" | "WBR" | "DM" | "ML" | "MC" | "MR" | "AML" | "AMC" | "AMR" | "ST";
-const APP_VERSION = "v0.2.17-dynamic-stag-benchmarks";
+const APP_VERSION = "v0.2.18-scouting-table-profile";
 const fmt = (value?: number, dp = 1) => value === undefined ? "-" : value.toFixed(dp);
 const scoreClass = (value?: number) => value === undefined ? "" : value >= 80 ? "elite" : value >= 65 ? "good" : value >= 50 ? "okay" : "low";
 const compactMoney = (value?: number) => {
@@ -43,6 +43,10 @@ const height = (value?: string | number) => {
   return `${Math.floor(inches / 12)}'${inches % 12}"`;
 };
 const money = (player: ScoredPlayer) => player.transferValueStatus === "not_for_sale" ? "Not for sale" : compactMoney(player.valueM);
+const apps = (player: ScoredPlayer) => player.apps ?? (player.minutes ? Math.round(Number(player.minutes) / 90) : undefined);
+const goals = (player: ScoredPlayer) => player.goals ?? (player.goals90 !== undefined && player.minutes ? Math.round(Number(player.goals90) * Number(player.minutes) / 90) : undefined);
+const assists = (player: ScoredPlayer) => player.assists ?? (player.assists90 !== undefined && player.minutes ? Math.round(Number(player.assists90) * Number(player.minutes) / 90) : undefined);
+const tabLabel = (value: Tab) => value === "rankings" ? "Scouting" : value;
 const POSITION_OPTIONS: { value: PositionFilter; label: string }[] = [
   { value: "", label: "All positions" }, { value: "GK", label: "GK" }, { value: "DL", label: "LB / D (L)" }, { value: "DC", label: "CB / D (C)" }, { value: "DR", label: "RB / D (R)" },
   { value: "WBL", label: "LWB / WB (L)" }, { value: "WBR", label: "RWB / WB (R)" }, { value: "DM", label: "DM" }, { value: "ML", label: "LM / M (L)" }, { value: "MC", label: "CM / M (C)" }, { value: "MR", label: "RM / M (R)" },
@@ -172,8 +176,9 @@ export default function Home() {
   }).sort((a, b) => {
     const aScore = rankingScores.get(a.id)!, bScore = rankingScores.get(b.id)!;
     const scoreValue = (score: RoleScore) => sortKey === "roleScore" ? score.roleScore : sortKey === "recruitmentScore" ? score.recruitmentScore : sortKey === "confidenceScore" ? score.confidenceScore : ["attribute", "stats", "hidden", "position", "value"].includes(sortKey) ? Number(score[sortKey as "attribute" | "stats" | "hidden" | "position" | "value"].score ?? 0) : undefined;
-    const aValue = scoreValue(aScore) ?? Number(a[sortKey] ?? 0);
-    const bValue = scoreValue(bScore) ?? Number(b[sortKey] ?? 0);
+    const tableValue = (player: ScoredPlayer) => sortKey === "apps" ? apps(player) : sortKey === "goals" ? goals(player) : sortKey === "assists" ? assists(player) : Number(player[sortKey] ?? 0);
+    const aValue = scoreValue(aScore) ?? Number(tableValue(a) ?? 0);
+    const bValue = scoreValue(bScore) ?? Number(tableValue(b) ?? 0);
     return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
   }), [players, rankingScores, search, minMinutes, minAge, maxAge, club, nation, positionFilter, foot, suitabilityFilter, maxWage, maxValue, minScore, includeMissingStats, includeMissingHidden, sortKey, sortDirection]);
   const compared = players.filter((player) => compareIds.includes(player.id));
@@ -212,7 +217,7 @@ export default function Home() {
 
   return <main className="shell">
     <header className="hero"><div><span className="eyebrow">FM24 recruitment</span><h1>FM Recruitment Lab</h1><p>Private browser-side scouting from uploaded FM HTML exports. Your file stays on this device.</p></div><div className="hero-stat"><strong>{players.length.toLocaleString()}</strong><span>players loaded</span></div></header>
-    <nav><div className="brand-title"><span>Brewerlabs</span> <b>FM</b> <span>Lab</span></div>{(["tactic", "rankings", "import", "compare", "instructions", "settings"] as Tab[]).map((value) => <button key={value} className={tab === value ? "active" : ""} onClick={() => setTab(value)}>{value}{value === "compare" ? ` (${compareIds.length})` : ""}</button>)}{players.length > 0 && <button className="clear" onClick={clearData}>Clear local data</button>}</nav>
+    <nav><div className="brand-title"><span>Brewerlabs</span> <b>FM</b> <span>Lab</span></div>{(["tactic", "rankings", "import", "compare", "instructions", "settings"] as Tab[]).map((value) => <button key={value} className={tab === value ? "active" : ""} onClick={() => setTab(value)}>{tabLabel(value)}{value === "compare" ? ` (${compareIds.length})` : ""}</button>)}{players.length > 0 && <button className="clear" onClick={clearData}>Clear local data</button>}</nav>
     {error && <div className="notice error">{error}</div>}
 
     {tab === "import" && <section className="panel import-panel"><div className="import-hero"><div><span className="eyebrow">Data centre</span><h2>Load recruitment database</h2><p>Use the saved player pool or upload fresh FM24 HTML exports. Everything is parsed and scored in this browser.</p></div><div className="import-loaded"><strong>{players.length.toLocaleString()}</strong><span>players ready</span></div></div>
@@ -247,7 +252,7 @@ function ValidationSummary({ report, onTactic }: { report: ValidationReport; onT
     <details><summary>Detected columns ({report.detectedColumns.length})</summary><p>{report.detectedColumns.join(", ")}</p></details><button className="primary" onClick={onTactic}>Open role board</button></>;
 }
 function Tactic({ onSelect }: { onSelect: (slot: SlotId, role: RoleId) => void }) {
-  return <section className="panel tactic-wrap"><div className="tactic-head"><div><span className="eyebrow">Role map</span><h2>Balanced FM24 roles</h2></div><p>Click any slot to open its rankings.</p></div><div className="tactic-board"><div className="pitch">{TACTIC_SLOTS.map((item) => {
+  return <section className="panel tactic-wrap"><div className="tactic-head"><div><span className="eyebrow">Role map</span><h2>Balanced FM24 roles</h2></div><p>Click any slot to open scouting.</p></div><div className="tactic-board"><div className="pitch">{TACTIC_SLOTS.map((item) => {
     const role = ROLE_CONFIG[item.roleId];
     return <button key={item.id} className="position" style={{ left: `${item.x}%`, top: `${item.y}%` }} onClick={() => onSelect(item.id, item.roleId)}><strong>{item.id}</strong><span>{roleAbbreviation(role)}</span></button>;
   })}</div><div className="tactic-role-list">{TACTIC_SLOTS.map((item) => {
@@ -256,8 +261,8 @@ function Tactic({ onSelect }: { onSelect: (slot: SlotId, role: RoleId) => void }
   })}</div></div></section>;
 }
 function RankTable({ players, total, scores, compareIds, sort, onOpen, onCompare }: { players: ScoredPlayer[]; total: number; scores: Map<string, RoleScore>; compareIds: string[]; sort: (key: SortKey) => void; onOpen: (player: ScoredPlayer) => void; onCompare: (id: string) => void }) {
-  const heads: [SortKey | "name" | "club" | "position" | "valueM" | "wageK", string][] = [["name", "Player"], ["age", "Age"], ["club", "Club"], ["position", "Position"], ["valueM", "FM Value"], ["wageK", "Wage"], ["roleScore", "Role Score"], ["recruitmentScore", "Recruitment"], ["confidenceScore", "Confidence"], ["attribute", "Attribute"], ["stats", "Adj Stats"], ["hidden", "Hidden/Profile"], ["position", "Position Score"], ["value", "Value Score"], ["minutes", "Mins"], ["averageRating", "Av Rat"]];
-  return <section className="panel table-panel"><div className="panel-head"><strong>{total.toLocaleString()} ranked matches</strong><span>{total > players.length ? `Showing first ${players.length.toLocaleString()} results` : "Showing all results"}</span></div>{!players.length ? <div className="empty-state">No players match the current filters.</div> : <div className="table-scroll"><table><thead><tr><th>#</th><th>Compare</th>{heads.map(([key, label]) => <th key={`${key}-${label}`} onClick={() => sort(key as SortKey)}>{label}</th>)}<th>Caps</th><th>Warnings</th></tr></thead><tbody>{players.map((player, index) => { const score = scores.get(player.id)!; return <tr key={player.id} onClick={() => onOpen(player)}><td>{index + 1}</td><td><button className={compareIds.includes(player.id) ? "compare active" : "compare"} onClick={(e) => { e.stopPropagation(); onCompare(player.id); }}>+</button></td><td><strong>{player.name}</strong><small>{player.nationality}</small></td><td>{fmt(player.age, 0)}</td><td>{player.club}</td><td>{player.position}</td><td>{money(player)}</td><td>{compactWage(player.wageK)}</td><td className={scoreClass(score.roleScore)}>{fmt(score.roleScore)}</td><td>{fmt(score.recruitmentScore)}</td><td>{fmt(score.confidenceScore)}</td><td>{fmt(score.attribute.score)}</td><td>{fmt(score.stats.score)}</td><td>{fmt(score.hidden.score)}</td><td>{fmt(score.position.score)}</td><td>{fmt(score.value.score)}</td><td>{fmt(player.minutes, 0)}</td><td>{fmt(player.averageRating, 2)}</td><td>{score.caps.join(", ") || "-"}</td><td>{score.warnings[0] ?? "-"}</td></tr>; })}</tbody></table></div>}</section>;
+  const heads: [SortKey | "name" | "club" | "position" | "valueM" | "wageK" | "apps" | "goals" | "assists", string][] = [["name", "Player"], ["age", "Age"], ["club", "Club"], ["position", "Position"], ["valueM", "FM Value"], ["wageK", "Wage"], ["roleScore", "Role Score"], ["recruitmentScore", "Recruitment"], ["confidenceScore", "Confidence"], ["attribute", "Attribute"], ["stats", "Adj Stats"], ["hidden", "Hidden/Profile"], ["position", "Position Score"], ["value", "Value Score"], ["apps", "Apps"], ["goals", "Goals"], ["assists", "Assists"], ["minutes", "Mins"], ["averageRating", "Av Rat"]];
+  return <section className="panel table-panel"><div className="panel-head"><strong>{total.toLocaleString()} scouting matches</strong><span>{total > players.length ? `Showing first ${players.length.toLocaleString()} results` : "Showing all results"}</span></div>{!players.length ? <div className="empty-state">No players match the current filters.</div> : <div className="table-scroll"><table><thead><tr><th>#</th><th>Compare</th>{heads.map(([key, label]) => <th key={`${key}-${label}`} onClick={() => sort(key as SortKey)}>{label}</th>)}<th>Caps</th><th>Warnings</th></tr></thead><tbody>{players.map((player, index) => { const score = scores.get(player.id)!; return <tr key={player.id} onClick={() => onOpen(player)}><td>{index + 1}</td><td><button className={compareIds.includes(player.id) ? "compare active" : "compare"} onClick={(e) => { e.stopPropagation(); onCompare(player.id); }}>+</button></td><td><strong>{player.name}</strong><small>{player.nationality}</small></td><td>{fmt(player.age, 0)}</td><td>{player.club}</td><td>{player.position}</td><td>{money(player)}</td><td>{compactWage(player.wageK)}</td><td className={scoreClass(score.roleScore)}>{fmt(score.roleScore)}</td><td>{fmt(score.recruitmentScore)}</td><td>{fmt(score.confidenceScore)}</td><td>{fmt(score.attribute.score)}</td><td>{fmt(score.stats.score)}</td><td>{fmt(score.hidden.score)}</td><td>{fmt(score.position.score)}</td><td>{fmt(score.value.score)}</td><td>{fmt(apps(player), 0)}</td><td>{fmt(goals(player), 0)}</td><td>{fmt(assists(player), 0)}</td><td>{fmt(player.minutes, 0)}</td><td>{fmt(player.averageRating, 2)}</td><td>{score.caps.join(", ") || "-"}</td><td>{score.warnings[0] ?? "-"}</td></tr>; })}</tbody></table></div>}</section>;
 }
 function Comparison({ players, roleId, onExport }: { players: ScoredPlayer[]; roleId: RoleId; onExport: () => void }) {
   const roles = Object.keys(ROLE_CONFIG) as RoleId[];
@@ -288,7 +293,7 @@ function Instructions() {
       <article><span className="step-number">01</span><h3>Use the default database</h3><p>The app will try to load the default R2 database automatically. If it does not, open Import and press Load Default Database. Refresh Default Database downloads the newest R2 version and replaces the browser cache.</p></article>
       <article><span className="step-number">02</span><h3>Build an FM player search</h3><p>In Football Manager, open Scouting or Player Search, expand the search scope as needed, and add the columns you want exported. The app works best when attributes, positions, value, wage, minutes and performance stats are visible.</p></article>
       <article><span className="step-number">03</span><h3>Export HTML from FM</h3><p>With the player list visible, use the FM menu to print/export the current view as a Web Page or HTML file. Save it somewhere easy to find, then upload that .html file in the Import tab.</p></article>
-      <article><span className="step-number">04</span><h3>Open rankings</h3><p>Choose a tactic position, then use Best Role Fit for pure football suitability. Best Signing / Value brings cost, wage and age into the decision, but cheap players should not beat elite fits unless their role score is strong.</p></article>
+      <article><span className="step-number">04</span><h3>Open scouting</h3><p>Choose a tactic position, then use Best Role Fit for pure football suitability. Best Signing / Value brings cost, wage and age into the decision, but cheap players should not beat elite fits unless their role score is strong.</p></article>
     </div>
     <div className="instruction-section"><h3>Recommended export columns</h3><div className="column-chip-list">{exportColumns.map((item) => <span key={item}>{item}</span>)}</div><p>Missing columns are allowed. Missing attributes are excluded from weighted attribute scoring and shown as warnings rather than treated as zero.</p></div>
     <div className="instruction-split">
@@ -332,7 +337,7 @@ function PlayerModal({ player, roleId, slot, benchmarks, onClose }: { player: Sc
         })}</div>;
       })}</div></section>
     </section>
-    <section className="fm-bottom-panels"><div><h3>Strengths</h3><StrengthList items={active.strengths} /></div><div><h3>Score breakdown</h3><Breakdown score={active} /></div><div><h3>Scoring notes</h3><ScoringNotes score={active} /></div></section></> : <ProfileTabContent tab={profileTab} player={player} score={active} slot={slot} benchmarks={benchmarks} />}
+    <section className="fm-bottom-panels"><div><h3>Strengths</h3><StrengthList items={active.strengths} /></div><div><h3>Score breakdown</h3><Breakdown score={active} /></div><div><h3>Weaknesses</h3><WeaknessList score={active} /></div></section></> : <ProfileTabContent tab={profileTab} player={player} score={active} slot={slot} benchmarks={benchmarks} />}
   </aside></div>;
 }
 function AssetImage({ src, alt, fallback }: { src?: string; alt: string; fallback: string }) {
@@ -472,6 +477,11 @@ function ScorePill({ label, value, dp = 1, tone = true }: { label: string; value
 function StrengthList({ items }: { items: string[] }) {
   if (!items.length) return <p className="empty-note">No standout exported attributes available.</p>;
   return <ul className="strength-list">{items.map((item) => <li key={item}>{item}</li>)}</ul>;
+}
+function WeaknessList({ score }: { score: RoleScore }) {
+  const items = [...score.weaknesses, ...score.caps, ...score.warnings].filter(Boolean);
+  if (!items.length) return <p className="empty-note">No major weaknesses flagged for this role.</p>;
+  return <ul className="weakness-list">{items.slice(0, 8).map((item) => <li key={item}>{item}</li>)}</ul>;
 }
 function ScoringNotes({ score }: { score: RoleScore }) {
   const concerns = [...score.caps, ...score.weaknesses, ...score.warnings];

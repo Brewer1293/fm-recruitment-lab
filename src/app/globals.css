@@ -1678,6 +1678,7 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   font-style: italic;
 }
 .strength-list,
+.weakness-list,
 .scoring-notes ul {
   display: grid;
   gap: 5px;
@@ -1686,6 +1687,7 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   padding: 0;
 }
 .strength-list li,
+.weakness-list li,
 .scoring-notes li {
   background: rgba(25,25,25,.58);
   border-left: 3px solid var(--orange);
@@ -1698,6 +1700,15 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
 .strength-list li:before {
   color: var(--orange-2);
   content: "+";
+  font-weight: 800;
+  margin-right: 7px;
+}
+.weakness-list li {
+  border-left-color: rgba(255,86,86,.82);
+}
+.weakness-list li:before {
+  color: #ff5656;
+  content: "!";
   font-weight: 800;
   margin-right: 7px;
 }

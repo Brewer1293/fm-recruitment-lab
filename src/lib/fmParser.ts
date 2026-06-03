@@ -9,7 +9,7 @@ const ALIASES: Record<string, string[]> = {
   contractType: ["contract type", "type"], contractStarted: ["contract started", "started"], contractExpires: ["contract expires", "expires"],
   playingTime: ["playing time", "agreed playing time", "actual playing time"], injury: ["injury"], injuryRisk: ["injury risk"],
   fatigue: ["fatigue"], morale: ["morale"], condition: ["condition", "con"], fitness: ["fitness"], sharpness: ["sharpness", "match sharpness", "shp"],
-  height: ["height"], valueM: ["transfer value", "value"], wageK: ["wage"], minutes: ["mins", "minutes"],
+  height: ["height"], valueM: ["transfer value", "value"], wageK: ["wage"], minutes: ["mins", "minutes"], apps: ["apps", "appearances", "apps."], goals: ["goals", "gls"], assists: ["assists", "asts", "ast"],
   averageRating: ["av rat", "average rating"], uid: ["uid"],
   acc: ["acc"], pac: ["pac"], sta: ["sta"], wor: ["wor"], cro: ["cro"], dri: ["dri", "drb"],
   nat: ["nat", "natural fitness"],
