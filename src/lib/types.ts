@@ -21,6 +21,10 @@ export type NormalizedPlayer = Record<string, string | number | RawPlayer | unde
   valueHighM?: number;
   transferValueStatus?: "fixed" | "range" | "not_for_sale" | "missing";
   wageK?: number;
+  contractType?: string;
+  contractStarted?: string;
+  contractExpires?: string;
+  playingTime?: string;
   minutes?: number;
   apps?: number;
   goals?: number;

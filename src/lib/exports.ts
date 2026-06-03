@@ -4,7 +4,7 @@ const quote = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`
 const download = (name: string, content: string, type: string) => {
   const link = document.createElement("a"); link.href = URL.createObjectURL(new Blob([content], { type })); link.download = name; link.click(); URL.revokeObjectURL(link.href);
 };
-const columns = ["name", "age", "club", "nationality", "position", "transferValueStatus", "valueM", "wageK", "minutes", "averageRating"];
+const columns = ["name", "age", "club", "division", "basedIn", "nationality", "position", "transferValueStatus", "valueM", "wageK", "contractType", "contractExpires", "playingTime", "minutes", "averageRating"];
 const row = (player: ScoredPlayer, score?: RoleScore) => [...columns.map((key) => player[key]), score?.roleScore, score?.recruitmentScore, score?.confidenceScore, score?.attribute.score, score?.stats.score, score?.hidden.score, score?.position.score, score?.value.score, score?.caps.join("; "), score?.warnings.join("; "), score?.strengths.join("; "), score?.weaknesses.join("; ")];
 const headers = [...columns, "roleScore", "recruitmentScore", "confidenceScore", "attributeScore", "adjustedStatsScore", "hiddenProfileScore", "positionScore", "valueScore", "caps", "warnings", "strengths", "concerns"];
 

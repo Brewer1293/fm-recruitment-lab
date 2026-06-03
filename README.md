@@ -13,6 +13,8 @@ Live app: `https://fmapp.brewerlabs.uk/`
 - Loads a default player database from Cloudflare R2 when available.
 - Loads player faces, club logos and nation logos from the `assets.brewerlabs.uk` asset bucket.
 - Provides FM-style player profiles, STAG stat baselines, comparison tools, import validation and export options.
+- Includes an interactive Data Hub with FM-style analytics cards and player scatter charts from imported stats.
+- Lets you add players from Scouting to a broader local Shortlist before choosing final Compare candidates.
 - Includes a Settings theme picker for orange, blue and emerald accent styles.
 - Shows the loaded-dataset players used as STAG baselines for each tactic role and metric.
 - Applies league coefficient weighting to performance metrics and STAG baselines when league/division data is exported.
@@ -63,7 +65,7 @@ https://fmapp.brewerlabs.uk/
 3. Export the view as a web page / HTML file.
 4. Open FM Recruitment Lab and upload the HTML file on the Import screen.
 5. Check Settings for the validation report if columns are missing.
-6. Use Tactic, Rankings, Compare and player profiles to scout.
+6. Use Tactic, Scouting, Data Hub, Shortlist, Compare and player profiles to scout.
 
 ## Default Database
 

@@ -10,13 +10,14 @@ import { PRESET_VERSION, ROLE_CONFIG, TACTIC_SLOTS } from "../lib/roleConfig";
 import { scoreForSlot, scorePlayers } from "../lib/scoring";
 import type { RoleId, RoleScore, ScoredPlayer, SlotId, ValidationReport } from "../lib/types";
 
-type Tab = "tactic" | "rankings" | "import" | "validation" | "compare" | "instructions" | "settings";
+type Tab = "tactic" | "rankings" | "datahub" | "shortlist" | "import" | "validation" | "compare" | "instructions" | "settings";
 type SortKey = "roleScore" | "recruitmentScore" | "confidenceScore" | "attribute" | "stats" | "hidden" | "position" | "value" | "age" | "minutes" | "apps" | "goals" | "assists" | "averageRating";
 type SuitabilityFilter = "role-position" | "conversion" | "all";
 type PositionFilter = "" | "GK" | "DL" | "DC" | "DR" | "WBL" | "WBR" | "DM" | "ML" | "MC" | "MR" | "AML" | "AMC" | "AMR" | "ST";
 type ThemeChoice = "orange" | "blue" | "emerald";
-const APP_VERSION = "v0.2.29-side-foot-preference";
+const APP_VERSION = "v0.2.32-transfer-shortlist-local";
 const THEME_STORAGE_KEY = "fm-recruitment-lab-theme";
+const SHORTLIST_STORAGE_KEY = "fm-recruitment-lab-shortlist";
 const THEME_OPTIONS: { value: ThemeChoice; label: string; description: string }[] = [
   { value: "orange", label: "Classic Orange", description: "The current FM Lab orange accent." },
   { value: "blue", label: "Cool Blue", description: "A colder analyst-style blue accent." },
@@ -54,7 +55,7 @@ const money = (player: ScoredPlayer) => player.transferValueStatus === "not_for_
 const apps = (player: ScoredPlayer) => player.apps ?? (player.minutes ? Math.round(Number(player.minutes) / 90) : undefined);
 const goals = (player: ScoredPlayer) => player.goals ?? (player.goals90 !== undefined && player.minutes ? Math.round(Number(player.goals90) * Number(player.minutes) / 90) : undefined);
 const assists = (player: ScoredPlayer) => player.assists ?? (player.assists90 !== undefined && player.minutes ? Math.round(Number(player.assists90) * Number(player.minutes) / 90) : undefined);
-const tabLabel = (value: Tab) => value === "rankings" ? "Scouting" : value;
+const tabLabel = (value: Tab) => value === "rankings" ? "Scouting" : value === "datahub" ? "Data Hub" : value === "shortlist" ? "Shortlist" : value;
 const POSITION_OPTIONS: { value: PositionFilter; label: string }[] = [
   { value: "", label: "All positions" }, { value: "GK", label: "GK" }, { value: "DL", label: "LB / D (L)" }, { value: "DC", label: "CB / D (C)" }, { value: "DR", label: "RB / D (R)" },
   { value: "WBL", label: "LWB / WB (L)" }, { value: "WBR", label: "RWB / WB (R)" }, { value: "DM", label: "DM" }, { value: "ML", label: "LM / M (L)" }, { value: "MC", label: "CM / M (C)" }, { value: "MR", label: "RM / M (R)" },
@@ -105,6 +106,19 @@ const STAT_TARGETS: Record<string, { field: string; target: number; label: strin
 type StagBaselinePlayer = { id: string; name: string; club?: string; nationality?: string; division?: string; minutes?: number; rawValue: number; adjustedValue: number; coefficient: number; leagueLabel: string };
 type StagBenchmark = { metricKey: string; roleId: RoleId; slot: SlotId; type: "positive" | "penalty"; source: "dataset" | "fixed"; sample: number; minutes: number; benchmark: number; thresholds: number[]; baselinePlayer?: StagBaselinePlayer };
 type StagBenchmarkMap = Record<string, StagBenchmark>;
+type DataHubCardId = "attacking" | "passing" | "defending" | "value" | "age" | "stag";
+type DataHubMetric = { label: string; field: keyof ScoredPlayer | "roleScore" | "recruitmentScore" | "stagScore"; suffix?: string; dp?: number; inverse?: boolean };
+type DataHubCardConfig = { id: DataHubCardId; title: string; subtitle: string; description: string; x: DataHubMetric; y: DataHubMetric; minMinutes: number };
+type DataHubCandidate = { player: ScoredPlayer; score: RoleScore };
+type DataHubPoint = { player: ScoredPlayer; x: number; y: number; roleScore: number; impact: number };
+const DATA_HUB_CARDS: DataHubCardConfig[] = [
+  { id: "attacking", title: "Attacking Efficiency", subtitle: "Output and shot quality", description: "Find forwards and creators combining regular shots with real end product.", minMinutes: 450, x: { label: "Shots per 90", field: "shots90", dp: 2 }, y: { label: "Goals per 90", field: "goals90", dp: 2 } },
+  { id: "passing", title: "Passing", subtitle: "Progression and accuracy", description: "Spot reliable passers who still move the ball forward.", minMinutes: 450, x: { label: "Pass Completion", field: "passCompletion", suffix: "%", dp: 0 }, y: { label: "Progressive Passes per 90", field: "progressivePasses90", dp: 2 } },
+  { id: "defending", title: "Defensive Activity", subtitle: "Duels and reading danger", description: "Compare players by defensive actions and interceptions.", minMinutes: 450, x: { label: "Tackles per 90", field: "tackles90", dp: 2 }, y: { label: "Interceptions per 90", field: "interceptions90", dp: 2 } },
+  { id: "value", title: "Recruitment Value", subtitle: "Role fit against cost", description: "Highlight players whose role suitability looks strong for their price.", minMinutes: 0, x: { label: "FM Value", field: "valueM", suffix: "m", dp: 1, inverse: true }, y: { label: "Role Score", field: "roleScore", dp: 1 } },
+  { id: "age", title: "Age Profile", subtitle: "Current level and development runway", description: "Separate ready-made quality from younger upside.", minMinutes: 0, x: { label: "Age", field: "age", dp: 0, inverse: true }, y: { label: "Recruitment Score", field: "recruitmentScore", dp: 1 } },
+  { id: "stag", title: "STAG Output", subtitle: "Adjusted form and reliability", description: "See who combines adjusted performance output with enough minutes to trust it.", minMinutes: 300, x: { label: "Minutes", field: "minutes", dp: 0 }, y: { label: "Adjusted Stats", field: "stagScore", dp: 1 } },
+];
 const BASELINE_MIN_ROLE_SCORE = 65;
 const BASELINE_MIN_QUALIFIED_PLAYERS = 20;
 const BASELINE_TOP_ROLE_POOL = 75;
@@ -184,7 +198,8 @@ export default function Home() {
   const [progress, setProgress] = useState({ message: "", percent: 0 }), [busy, setBusy] = useState(false);
   const [roleId, setRoleId] = useState<RoleId>("af-at"), [slot, setSlot] = useState<SlotId>("ST");
   const [theme, setTheme] = useState<ThemeChoice>("orange");
-  const [selected, setSelected] = useState<ScoredPlayer | null>(null), [compareIds, setCompareIds] = useState<string[]>([]);
+  const [selected, setSelected] = useState<ScoredPlayer | null>(null), [compareIds, setCompareIds] = useState<string[]>([]), [shortlistIds, setShortlistIds] = useState<string[]>([]);
+  const [dataHubCard, setDataHubCard] = useState<DataHubCardId>("attacking");
   const [search, setSearch] = useState(""), [minMinutes, setMinMinutes] = useState(0), [maxAge, setMaxAge] = useState(50);
   const [minAge, setMinAge] = useState(0), [club, setClub] = useState(""), [nation, setNation] = useState(""), [positionFilter, setPositionFilter] = useState<PositionFilter>(""), [foot, setFoot] = useState("");
   const [suitabilityFilter, setSuitabilityFilter] = useState<SuitabilityFilter>("role-position");
@@ -215,8 +230,10 @@ export default function Home() {
     return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
   }), [players, rankingScores, search, minMinutes, minAge, maxAge, club, nation, positionFilter, foot, suitabilityFilter, maxWage, maxValue, minScore, includeMissingStats, includeMissingHidden, sortKey, sortDirection]);
   const compared = players.filter((player) => compareIds.includes(player.id));
+  const shortlisted = shortlistIds.map((id) => players.find((player) => player.id === id)).filter((player): player is ScoredPlayer => Boolean(player));
   const stagBenchmarks = useMemo(() => buildStagBenchmarks(players), [players]);
-  const selectedRankIndex = selected ? rankings.findIndex((player) => player.id === selected.id) : -1;
+  const modalPlayers = tab === "shortlist" ? shortlisted : rankings;
+  const selectedRankIndex = selected ? modalPlayers.findIndex((player) => player.id === selected.id) : -1;
 
   useEffect(() => {
     if (defaultLoadStarted.current || players.length) return;
@@ -226,11 +243,20 @@ export default function Home() {
   useEffect(() => {
     const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
     if (stored === "orange" || stored === "blue" || stored === "emerald") setTheme(stored);
+    try {
+      const storedShortlist = JSON.parse(window.localStorage.getItem(SHORTLIST_STORAGE_KEY) ?? "[]");
+      if (Array.isArray(storedShortlist)) setShortlistIds(storedShortlist.filter((value): value is string => typeof value === "string"));
+    } catch {
+      window.localStorage.removeItem(SHORTLIST_STORAGE_KEY);
+    }
   }, []);
   useEffect(() => {
     document.body.dataset.theme = theme;
     window.localStorage.setItem(THEME_STORAGE_KEY, theme);
   }, [theme]);
+  useEffect(() => {
+    window.localStorage.setItem(SHORTLIST_STORAGE_KEY, JSON.stringify(shortlistIds));
+  }, [shortlistIds]);
 
   async function handleFiles(files: File[]) {
     setBusy(true); setError(""); setProgress({ message: "Preparing upload", percent: 0 });
@@ -262,17 +288,18 @@ export default function Home() {
     setTab("rankings");
   }
   function toggleCompare(id: string) { setCompareIds((current) => current.includes(id) ? current.filter((value) => value !== id) : current.length < 4 ? [...current, id] : current); }
-  function clearData() { setPlayers([]); setReport(null); setCompareIds([]); setSelected(null); setTab("import"); }
+  function toggleShortlist(id: string) { setShortlistIds((current) => current.includes(id) ? current.filter((value) => value !== id) : [...current, id]); }
+  function clearData() { setPlayers([]); setReport(null); setCompareIds([]); setShortlistIds([]); setSelected(null); setTab("import"); }
   function sort(next: SortKey) { if (sortKey === next) setSortDirection((value) => value === "desc" ? "asc" : "desc"); else { setSortKey(next); setSortDirection("desc"); } }
   function selectAdjacentPlayer(direction: -1 | 1) {
     if (selectedRankIndex < 0) return;
-    const nextPlayer = rankings[selectedRankIndex + direction];
+    const nextPlayer = modalPlayers[selectedRankIndex + direction];
     if (nextPlayer) setSelected(nextPlayer);
   }
 
   return <main className="shell">
     <header className="hero"><div><span className="eyebrow">FM24 recruitment</span><h1>FM Recruitment Lab</h1><p>Private browser-side scouting from uploaded FM HTML exports. Your file stays on this device.</p></div><div className="hero-stat"><strong>{players.length.toLocaleString()}</strong><span>players loaded</span></div></header>
-    <nav><div className="brand-title"><span>Brewerlabs</span> <b>FM</b> <span>Lab</span></div>{(["tactic", "rankings", "import", "compare", "instructions", "settings"] as Tab[]).map((value) => <button key={value} className={tab === value ? "active" : ""} onClick={() => setTab(value)}>{tabLabel(value)}{value === "compare" ? ` (${compareIds.length})` : ""}</button>)}{players.length > 0 && <button className="clear" onClick={clearData}>Clear local data</button>}</nav>
+    <nav><div className="brand-title"><span>Brewerlabs</span> <b>FM</b> <span>Lab</span></div>{(["tactic", "rankings", "datahub", "shortlist", "compare", "instructions", "import", "settings"] as Tab[]).map((value) => <button key={value} className={tab === value ? "active" : ""} onClick={() => setTab(value)}>{tabLabel(value)}{value === "compare" ? ` (${compareIds.length})` : value === "shortlist" ? ` (${shortlistIds.length})` : ""}</button>)}{players.length > 0 && <button className="clear" onClick={clearData}>Clear local data</button>}</nav>
     {error && <div className="notice error">{error}</div>}
 
     {tab === "import" && <section className="panel import-panel"><div className="import-hero"><div><span className="eyebrow">Data centre</span><h2>Load recruitment database</h2><p>Use the saved player pool or upload fresh FM24 HTML exports. Everything is parsed and scored in this browser.</p></div><div className="import-loaded"><strong>{players.length.toLocaleString()}</strong><span>players ready</span></div></div>
@@ -288,11 +315,13 @@ export default function Home() {
       {filtersOpen && <><div className="filter-grid"><label>Search<input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Player or club" /></label><label>Club<input value={club} onChange={(e) => setClub(e.target.value)} placeholder="Any club" /></label><label>Nation<input value={nation} onChange={(e) => setNation(e.target.value)} placeholder="Any nation" /></label><label>Position<select value={positionFilter} onChange={(e) => setPositionFilter(e.target.value as PositionFilter)}>{POSITION_OPTIONS.map((option) => <option key={option.value || "all"} value={option.value}>{option.label}</option>)}</select></label><label>Role suitability<select value={suitabilityFilter} onChange={(e) => setSuitabilityFilter(e.target.value as SuitabilityFilter)}><option value="role-position">Role position only</option><option value="conversion">Include conversions</option><option value="all">All players</option></select></label><label>Footedness<input value={foot} onChange={(e) => setFoot(e.target.value)} placeholder="left / right / either" /></label><label>Minimum minutes<input type="number" value={minMinutes} onChange={(e) => setMinMinutes(Number(e.target.value))} /></label><label>Minimum age<input type="number" value={minAge} onChange={(e) => setMinAge(Number(e.target.value))} /></label><label>Maximum age<input type="number" value={maxAge} onChange={(e) => setMaxAge(Number(e.target.value))} /></label><label>Maximum wage £k/w<input type="number" value={maxWage} onChange={(e) => setMaxWage(Number(e.target.value))} /></label><label>Maximum value £m<input type="number" value={maxValue} onChange={(e) => setMaxValue(Number(e.target.value))} /></label><label>Minimum Role Score<input type="number" value={minScore} onChange={(e) => setMinScore(Number(e.target.value))} /></label></div>
       <div className="toggles"><label><input type="checkbox" checked={includeMissingStats} onChange={(e) => setIncludeMissingStats(e.target.checked)} /> Include missing stats</label><label><input type="checkbox" checked={includeMissingHidden} onChange={(e) => setIncludeMissingHidden(e.target.checked)} /> Include missing hidden data</label>
       <button onClick={() => exportCSV(`${slot}-${roleId}-rankings.csv`, rankings, rankingScores)}>Export CSV</button><button onClick={() => exportHTML(`${slot}-${roleId}-rankings.html`, rankings, rankingScores)}>Export HTML</button></div></>}</section>
-      <RankTable players={rankings.slice(0, 500)} total={rankings.length} scores={rankingScores} compareIds={compareIds} sort={sort} onOpen={setSelected} onCompare={toggleCompare} /></section>}
+      <RankTable players={rankings.slice(0, 500)} total={rankings.length} scores={rankingScores} compareIds={compareIds} shortlistIds={shortlistIds} sort={sort} onOpen={setSelected} onCompare={toggleCompare} onShortlist={toggleShortlist} /></section>}
+    {tab === "datahub" && <DataHub players={players} roleId={roleId} slot={slot} activeCardId={dataHubCard} onCardChange={setDataHubCard} onOpen={setSelected} />}
+    {tab === "shortlist" && <Shortlist players={shortlisted} scores={rankingScores} compareIds={compareIds} shortlistIds={shortlistIds} onOpen={setSelected} onCompare={toggleCompare} onShortlist={toggleShortlist} onClear={() => setShortlistIds([])} onExport={() => exportCSV("fm-recruitment-shortlist.csv", shortlisted, rankingScores)} />}
     {tab === "compare" && <Comparison players={compared} roleId={roleId} onExport={() => exportCSV("fm-recruitment-comparison.csv", compared)} />}
     {tab === "instructions" && <Instructions />}
     {tab === "settings" && <Settings report={report} theme={theme} benchmarks={stagBenchmarks} onThemeChange={setTheme} onTactic={() => setTab("tactic")} onExport={() => exportCSV("fm-recruitment-full-scored-dataset.csv", players)} />}
-    {selected && <PlayerModal player={selected} slot={slot} roleId={roleId} benchmarks={stagBenchmarks} rankIndex={selectedRankIndex} rankTotal={rankings.length} onPrevious={selectedRankIndex > 0 ? () => selectAdjacentPlayer(-1) : undefined} onNext={selectedRankIndex >= 0 && selectedRankIndex < rankings.length - 1 ? () => selectAdjacentPlayer(1) : undefined} onClose={() => setSelected(null)} />}
+    {selected && <PlayerModal player={selected} slot={slot} roleId={roleId} benchmarks={stagBenchmarks} rankIndex={selectedRankIndex} rankTotal={modalPlayers.length} onPrevious={selectedRankIndex > 0 ? () => selectAdjacentPlayer(-1) : undefined} onNext={selectedRankIndex >= 0 && selectedRankIndex < modalPlayers.length - 1 ? () => selectAdjacentPlayer(1) : undefined} onClose={() => setSelected(null)} />}
     <div className="app-version">{APP_VERSION}</div>
   </main>;
 }
@@ -315,9 +344,95 @@ function Tactic({ onSelect }: { onSelect: (slot: SlotId, role: RoleId) => void }
     return <button key={item.id} className="tactic-role-card" onClick={() => onSelect(item.id, item.roleId)}><span>{item.id}</span><strong>{roleDisplayName(role)}</strong><small>{role.shortName}</small></button>;
   })}</div></div></section>;
 }
-function RankTable({ players, total, scores, compareIds, sort, onOpen, onCompare }: { players: ScoredPlayer[]; total: number; scores: Map<string, RoleScore>; compareIds: string[]; sort: (key: SortKey) => void; onOpen: (player: ScoredPlayer) => void; onCompare: (id: string) => void }) {
+function RankTable({ players, total, scores, compareIds, shortlistIds, sort, onOpen, onCompare, onShortlist }: { players: ScoredPlayer[]; total: number; scores: Map<string, RoleScore>; compareIds: string[]; shortlistIds: string[]; sort: (key: SortKey) => void; onOpen: (player: ScoredPlayer) => void; onCompare: (id: string) => void; onShortlist: (id: string) => void }) {
   const heads: [SortKey | "name" | "club" | "position" | "valueM" | "wageK" | "apps" | "goals" | "assists", string][] = [["name", "Player"], ["age", "Age"], ["club", "Club"], ["position", "Position"], ["valueM", "FM Value"], ["wageK", "Wage"], ["roleScore", "Role Score"], ["recruitmentScore", "Recruitment"], ["confidenceScore", "Confidence"], ["attribute", "Attribute"], ["stats", "Adj Stats"], ["hidden", "Hidden/Profile"], ["position", "Position Score"], ["value", "Value Score"], ["apps", "Apps"], ["goals", "Goals"], ["assists", "Assists"], ["minutes", "Mins"], ["averageRating", "Av Rat"]];
-  return <section className="panel table-panel"><div className="panel-head"><strong>{total.toLocaleString()} scouting matches</strong><span>{total > players.length ? `Showing first ${players.length.toLocaleString()} results` : "Showing all results"}</span></div>{!players.length ? <div className="empty-state">No players match the current filters.</div> : <div className="table-scroll"><table><thead><tr><th>#</th><th>Compare</th>{heads.map(([key, label]) => <th key={`${key}-${label}`} onClick={() => sort(key as SortKey)}>{label}</th>)}<th>Caps</th><th>Warnings</th></tr></thead><tbody>{players.map((player, index) => { const score = scores.get(player.id)!; return <tr key={player.id} onClick={() => onOpen(player)}><td>{index + 1}</td><td><button className={compareIds.includes(player.id) ? "compare active" : "compare"} onClick={(e) => { e.stopPropagation(); onCompare(player.id); }}>+</button></td><td><strong>{player.name}</strong><small>{player.nationality}</small></td><td>{fmt(player.age, 0)}</td><td>{player.club}</td><td>{player.position}</td><td>{money(player)}</td><td>{compactWage(player.wageK)}</td><td className={scoreClass(score.roleScore)}>{fmt(score.roleScore)}</td><td>{fmt(score.recruitmentScore)}</td><td>{fmt(score.confidenceScore)}</td><td>{fmt(score.attribute.score)}</td><td>{fmt(score.stats.score)}</td><td>{fmt(score.hidden.score)}</td><td>{fmt(score.position.score)}</td><td>{fmt(score.value.score)}</td><td>{fmt(apps(player), 0)}</td><td>{fmt(goals(player), 0)}</td><td>{fmt(assists(player), 0)}</td><td>{fmt(player.minutes, 0)}</td><td>{fmt(player.averageRating, 2)}</td><td>{score.caps.join(", ") || "-"}</td><td>{score.warnings[0] ?? "-"}</td></tr>; })}</tbody></table></div>}</section>;
+  return <section className="panel table-panel"><div className="panel-head"><strong>{total.toLocaleString()} scouting matches</strong><span>{total > players.length ? `Showing first ${players.length.toLocaleString()} results` : "Showing all results"}</span></div>{!players.length ? <div className="empty-state">No players match the current filters.</div> : <div className="table-scroll"><table><thead><tr><th>#</th><th>Compare</th><th>Shortlist</th>{heads.map(([key, label]) => <th key={`${key}-${label}`} onClick={() => sort(key as SortKey)}>{label}</th>)}<th>Caps</th><th>Warnings</th></tr></thead><tbody>{players.map((player, index) => { const score = scores.get(player.id)!; return <tr key={player.id} onClick={() => onOpen(player)}><td>{index + 1}</td><td><button title="Compare player" className={compareIds.includes(player.id) ? "table-action active" : "table-action"} onClick={(e) => { e.stopPropagation(); onCompare(player.id); }}>+</button></td><td><button title="Toggle shortlist" className={shortlistIds.includes(player.id) ? "table-action shortlist active" : "table-action shortlist"} onClick={(e) => { e.stopPropagation(); onShortlist(player.id); }}>★</button></td><td><strong>{player.name}</strong><small>{player.nationality}</small></td><td>{fmt(player.age, 0)}</td><td>{player.club}</td><td>{player.position}</td><td>{money(player)}</td><td>{compactWage(player.wageK)}</td><td className={scoreClass(score.roleScore)}>{fmt(score.roleScore)}</td><td>{fmt(score.recruitmentScore)}</td><td>{fmt(score.confidenceScore)}</td><td>{fmt(score.attribute.score)}</td><td>{fmt(score.stats.score)}</td><td>{fmt(score.hidden.score)}</td><td>{fmt(score.position.score)}</td><td>{fmt(score.value.score)}</td><td>{fmt(apps(player), 0)}</td><td>{fmt(goals(player), 0)}</td><td>{fmt(assists(player), 0)}</td><td>{fmt(player.minutes, 0)}</td><td>{fmt(player.averageRating, 2)}</td><td>{score.caps.join(", ") || "-"}</td><td>{score.warnings[0] ?? "-"}</td></tr>; })}</tbody></table></div>}</section>;
+}
+function DataHub({ players, roleId, slot, activeCardId, onCardChange, onOpen }: { players: ScoredPlayer[]; roleId: RoleId; slot: SlotId; activeCardId: DataHubCardId; onCardChange: (id: DataHubCardId) => void; onOpen: (player: ScoredPlayer) => void }) {
+  const activeCard = DATA_HUB_CARDS.find((card) => card.id === activeCardId) ?? DATA_HUB_CARDS[0];
+  const context = `${slot} · ${roleDisplayName(ROLE_CONFIG[roleId])}`;
+  const suitableCandidates = useMemo(() => players.map((player) => {
+    const score = scoreForSlot(player, roleId, slot);
+    return Number(score.position.score ?? 0) >= 80 ? { player, score } : undefined;
+  }).filter((entry): entry is DataHubCandidate => Boolean(entry)), [players, roleId, slot]);
+  const cardPoints = useMemo(() => Object.fromEntries(DATA_HUB_CARDS.map((card) => [card.id, buildDataHubPoints(suitableCandidates, card)])) as Record<DataHubCardId, DataHubPoint[]>, [suitableCandidates]);
+  const points = cardPoints[activeCard.id] ?? [];
+  const leaders = [...points].sort((a, b) => b.impact - a.impact).slice(0, 6);
+
+  return <section className="datahub">
+    <section className="datahub-header"><div><span className="eyebrow">Performance</span><h2>Data Hub</h2><p>Interactive analytics from the loaded FM export. Charts use role-suitable players for the current tactic slot.</p></div><div className="datahub-context"><span>Current view</span><strong>{context}</strong><small>{suitableCandidates.length.toLocaleString()} qualified players</small></div></section>
+    <section className="datahub-grid">{DATA_HUB_CARDS.map((card) => {
+      const previewPoints = cardPoints[card.id] ?? [];
+      const preview = [...previewPoints].sort((a, b) => b.impact - a.impact)[0];
+      return <button key={card.id} className={activeCard.id === card.id ? "data-card active" : "data-card"} onClick={() => onCardChange(card.id)}><span>{card.title}</span><strong>{preview ? preview.player.name : "-"}</strong><small>{card.subtitle}</small><DataMiniPlot points={previewPoints} /></button>;
+    })}</section>
+    <section className="datahub-detail">
+      <article className="panel data-chart-panel"><div className="data-chart-head"><div><span className="eyebrow">{activeCard.subtitle}</span><h3>{activeCard.title}</h3><p>{activeCard.description}</p></div><div><strong>{points.length.toLocaleString()}</strong><span>chart players</span></div></div><DataScatterPlot card={activeCard} points={points} onOpen={onOpen} /></article>
+      <article className="panel data-leaders"><span className="eyebrow">Metric leaders</span><h3>{activeCard.title}</h3>{leaders.length ? leaders.map((point, index) => <button key={point.player.id} onClick={() => onOpen(point.player)}><span>{index + 1}</span><strong>{point.player.name}<small>{point.player.club ?? "-"} · {fmt(point.player.minutes, 0)} mins</small></strong><em>{formatDataMetric(point.y, activeCard.y)}</em></button>) : <p className="empty-note">No players have enough exported data for this chart.</p>}</article>
+    </section>
+  </section>;
+}
+function buildDataHubPoints(candidates: DataHubCandidate[], card: DataHubCardConfig): DataHubPoint[] {
+  return candidates.filter(({ player }) => Number(player.minutes ?? 0) >= card.minMinutes).map(({ player, score }) => {
+    const x = dataMetricValue(player, card.x, score), y = dataMetricValue(player, card.y, score);
+    if (x === undefined || y === undefined) return undefined;
+    const roleScore = score.roleScore;
+    const impact = (card.y.inverse ? -y : y) + roleScore / 100;
+    return { player, x, y, roleScore, impact };
+  }).filter((point): point is DataHubPoint => Boolean(point));
+}
+function dataMetricValue(player: ScoredPlayer, metric: DataHubMetric, score: RoleScore) {
+  if (metric.field === "roleScore") return score.roleScore;
+  if (metric.field === "recruitmentScore") return score.recruitmentScore;
+  if (metric.field === "stagScore") return score.stats.score;
+  const value = player[metric.field];
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+function formatDataMetric(value: number, metric: DataHubMetric) {
+  const shown = value.toFixed(metric.dp ?? 1).replace(/\.0$/, "");
+  return metric.suffix === "m" ? `£${shown}M` : `${shown}${metric.suffix ?? ""}`;
+}
+function chartExtent(values: number[]) {
+  if (!values.length) return { min: 0, max: 1 };
+  const min = Math.min(...values), max = Math.max(...values);
+  if (min === max) return { min: min - 1, max: max + 1 };
+  const pad = (max - min) * 0.08;
+  return { min: min - pad, max: max + pad };
+}
+function DataScatterPlot({ card, points, onOpen }: { card: DataHubCardConfig; points: DataHubPoint[]; onOpen: (player: ScoredPlayer) => void }) {
+  const visiblePoints = points.slice().sort((a, b) => a.roleScore - b.roleScore).slice(-900);
+  const xExtent = chartExtent(visiblePoints.map((point) => point.x)), yExtent = chartExtent(visiblePoints.map((point) => point.y));
+  const xScale = (value: number) => 48 + ((value - xExtent.min) / (xExtent.max - xExtent.min)) * 604;
+  const yScale = (value: number) => 318 - ((value - yExtent.min) / (yExtent.max - yExtent.min)) * 260;
+  const avgX = visiblePoints.reduce((sum, point) => sum + point.x, 0) / Math.max(visiblePoints.length, 1), avgY = visiblePoints.reduce((sum, point) => sum + point.y, 0) / Math.max(visiblePoints.length, 1);
+  return <div className="scatter-wrap"><svg viewBox="0 0 700 360" role="img" aria-label={`${card.title} scatter chart`}>
+    <rect x="0" y="0" width="700" height="360" rx="10" />
+    {[0, 1, 2, 3].map((tick) => <g key={tick}><line x1={48 + tick * 151} x2={48 + tick * 151} y1="38" y2="318" /><line x1="48" x2="652" y1={58 + tick * 86} y2={58 + tick * 86} /></g>)}
+    <line className="avg-line" x1={xScale(avgX)} x2={xScale(avgX)} y1="38" y2="318" /><line className="avg-line" x1="48" x2="652" y1={yScale(avgY)} y2={yScale(avgY)} />
+    <text x="50" y="30">{card.y.label}</text><text x="652" y="342" textAnchor="end">{card.x.label}</text>
+    {visiblePoints.map((point) => <circle key={point.player.id} className={point.roleScore >= 80 ? "elite-dot" : point.roleScore >= 65 ? "good-dot" : ""} cx={xScale(point.x)} cy={yScale(point.y)} r={point.roleScore >= 80 ? 5 : 4} onClick={() => onOpen(point.player)}>
+      <title>{`${point.player.name} · ${point.player.club ?? "-"}\n${card.x.label}: ${formatDataMetric(point.x, card.x)}\n${card.y.label}: ${formatDataMetric(point.y, card.y)}\nRole Score: ${fmt(point.roleScore)}`}</title>
+    </circle>)}
+  </svg><div className="scatter-meta"><span>{card.x.inverse ? "Lower/right depends on context" : "Further right is stronger"}</span><span>{card.y.inverse ? "Lower is stronger" : "Higher is stronger"}</span><span>Hover dots for player details, click to open profile.</span></div></div>;
+}
+function DataMiniPlot({ points }: { points: DataHubPoint[] }) {
+  const sample = points.slice().sort((a, b) => b.impact - a.impact).slice(0, 18);
+  const xExtent = chartExtent(sample.map((point) => point.x)), yExtent = chartExtent(sample.map((point) => point.y));
+  const xScale = (value: number) => 8 + ((value - xExtent.min) / (xExtent.max - xExtent.min)) * 78;
+  const yScale = (value: number) => 48 - ((value - yExtent.min) / (yExtent.max - yExtent.min)) * 38;
+  return <svg className="mini-plot" viewBox="0 0 94 58" aria-hidden="true"><line x1="8" x2="86" y1="48" y2="48" /><line x1="8" x2="8" y1="10" y2="48" />{sample.map((point) => <circle key={point.player.id} cx={xScale(point.x)} cy={yScale(point.y)} r="2.5" />)}</svg>;
+}
+function Shortlist({ players, scores, compareIds, shortlistIds, onOpen, onCompare, onShortlist, onClear, onExport }: { players: ScoredPlayer[]; scores: Map<string, RoleScore>; compareIds: string[]; shortlistIds: string[]; onOpen: (player: ScoredPlayer) => void; onCompare: (id: string) => void; onShortlist: (id: string) => void; onClear: () => void; onExport: () => void }) {
+  return <section className="shortlist-layout"><section className="panel shortlist-hero"><div><span className="eyebrow">Transfer desk</span><h2>Shortlist</h2><p>Track targets by cost, contract, club context and current role fit before moving the best options into Compare.</p></div><div className="shortlist-actions"><button disabled={!players.length} onClick={onExport}>Export CSV</button><button disabled={!players.length} onClick={onClear}>Clear shortlist</button></div></section>
+    {players.length ? <ShortlistTable players={players} scores={scores} compareIds={compareIds} shortlistIds={shortlistIds} onOpen={onOpen} onCompare={onCompare} onShortlist={onShortlist} /> : <section className="panel empty-state">No shortlisted players yet. Add players with the star button on Scouting.</section>}
+  </section>;
+}
+function ShortlistTable({ players, scores, compareIds, shortlistIds, onOpen, onCompare, onShortlist }: { players: ScoredPlayer[]; scores: Map<string, RoleScore>; compareIds: string[]; shortlistIds: string[]; onOpen: (player: ScoredPlayer) => void; onCompare: (id: string) => void; onShortlist: (id: string) => void }) {
+  return <section className="panel table-panel shortlist-table-panel"><div className="panel-head"><strong>{players.length.toLocaleString()} transfer targets</strong><span>Contract, value and league context</span></div><div className="table-scroll shortlist-scroll"><table className="shortlist-table"><thead><tr><th>#</th><th>Compare</th><th>Remove</th><th>Player</th><th>Age</th><th>Position</th><th>Club</th><th>Division</th><th>Based</th><th>Value</th><th>Wage</th><th>Contract</th><th>Expires</th><th>Playing Time</th><th>Role Score</th><th>Recruitment</th><th>Confidence</th><th>Mins</th><th>Av Rat</th><th>Notes</th></tr></thead><tbody>{players.map((player, index) => {
+    const score = scores.get(player.id) ?? player.scores["af-at"];
+    const notes = [...score.warnings, ...(player.transferValueStatus === "not_for_sale" ? ["Not for sale"] : [])].slice(0, 2);
+    return <tr key={player.id} onClick={() => onOpen(player)}><td>{index + 1}</td><td><button title="Compare player" className={compareIds.includes(player.id) ? "table-action active" : "table-action"} onClick={(e) => { e.stopPropagation(); onCompare(player.id); }}>+</button></td><td><button title="Remove from shortlist" className={shortlistIds.includes(player.id) ? "table-action shortlist active" : "table-action shortlist"} onClick={(e) => { e.stopPropagation(); onShortlist(player.id); }}>★</button></td><td><strong>{player.name}</strong><small>{player.nationality}</small></td><td>{fmt(player.age, 0)}</td><td>{player.position}</td><td>{player.club ?? "-"}</td><td>{textValue(player.division)}</td><td>{textValue(player.basedIn ?? player.based)}</td><td>{money(player)}</td><td>{compactWage(player.wageK)}</td><td>{textValue(player.contractType)}</td><td>{textValue(player.contractExpires)}</td><td>{textValue(player.playingTime)}</td><td className={scoreClass(score.roleScore)}>{fmt(score.roleScore)}</td><td>{fmt(score.recruitmentScore)}</td><td>{fmt(score.confidenceScore)}</td><td>{fmt(player.minutes, 0)}</td><td>{fmt(player.averageRating, 2)}</td><td>{notes.join(", ") || "-"}</td></tr>;
+  })}</tbody></table></div></section>;
 }
 function Comparison({ players, roleId, onExport }: { players: ScoredPlayer[]; roleId: RoleId; onExport: () => void }) {
   const roles = Object.keys(ROLE_CONFIG) as RoleId[];

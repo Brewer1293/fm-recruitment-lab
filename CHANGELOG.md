@@ -6,6 +6,10 @@ Update this file before each live push to the standalone FM app.
 
 ## Unreleased
 
+- Changed Shortlist into a transfer-focused view with value, wage, contract, expiry, playing time and league context columns.
+- Added a local interactive Data Hub with FM-style analytics cards, scatter charts, hoverable player dots and metric leaders.
+- Added a local Shortlist tab and Scouting star action for collecting broader recruitment targets.
+- Moved Import lower in the sidebar, directly above Settings.
 - Added league coefficient weighting to performance metrics, STAG score impacts and loaded-dataset STAG baselines.
 - Added the R2 bucket CORS config used by the default database and local preview ports.
 - Tightened STAG baselines so they are calibrated from top role-fit players, with robust high-percentile handling for volatile percentage metrics.
