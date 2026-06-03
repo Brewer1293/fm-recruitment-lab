@@ -9,11 +9,11 @@ import { PRESET_VERSION, ROLE_CONFIG, TACTIC_SLOTS } from "../lib/roleConfig";
 import { scoreForSlot, scorePlayers } from "../lib/scoring";
 import type { RoleId, RoleScore, ScoredPlayer, SlotId, ValidationReport } from "../lib/types";
 
-type Tab = "tactic" | "rankings" | "import" | "validation" | "compare" | "settings";
+type Tab = "tactic" | "rankings" | "import" | "validation" | "compare" | "instructions" | "settings";
 type SortKey = "roleScore" | "recruitmentScore" | "confidenceScore" | "attribute" | "stats" | "hidden" | "position" | "value" | "age" | "minutes" | "averageRating";
 type SuitabilityFilter = "role-position" | "conversion" | "all";
 type PositionFilter = "" | "GK" | "DL" | "DC" | "DR" | "WBL" | "WBR" | "DM" | "ML" | "MC" | "MR" | "AML" | "AMC" | "AMR" | "ST";
-const APP_VERSION = "v0.2.4-clean-assets";
+const APP_VERSION = "v0.2.5-instructions";
 const fmt = (value?: number, dp = 1) => value === undefined ? "-" : value.toFixed(dp);
 const scoreClass = (value?: number) => value === undefined ? "" : value >= 80 ? "elite" : value >= 65 ? "good" : value >= 50 ? "okay" : "low";
 const compactMoney = (value?: number) => {
@@ -206,7 +206,7 @@ export default function Home() {
 
   return <main className="shell">
     <header className="hero"><div><span className="eyebrow">FM24 recruitment</span><h1>FM Recruitment Lab</h1><p>Private browser-side scouting from uploaded FM HTML exports. Your file stays on this device.</p></div><div className="hero-stat"><strong>{players.length.toLocaleString()}</strong><span>players loaded</span></div></header>
-    <nav><div className="brand-title"><span>Brewerlabs</span> <b>FM</b> <span>Lab</span></div>{(["tactic", "rankings", "import", "validation", "compare", "settings"] as Tab[]).map((value) => <button key={value} className={tab === value ? "active" : ""} onClick={() => setTab(value)}>{value}{value === "compare" ? ` (${compareIds.length})` : ""}</button>)}{players.length > 0 && <button className="clear" onClick={clearData}>Clear local data</button>}</nav>
+    <nav><div className="brand-title"><span>Brewerlabs</span> <b>FM</b> <span>Lab</span></div>{(["tactic", "rankings", "import", "validation", "compare", "instructions", "settings"] as Tab[]).map((value) => <button key={value} className={tab === value ? "active" : ""} onClick={() => setTab(value)}>{value}{value === "compare" ? ` (${compareIds.length})` : ""}</button>)}{players.length > 0 && <button className="clear" onClick={clearData}>Clear local data</button>}</nav>
     {error && <div className="notice error">{error}</div>}
 
     {tab === "import" && <section className="panel import-panel"><span className="eyebrow">Step one</span><h2>Upload FM HTML exports</h2><p>Select one or more FM24 player-search HTML exports. Files are streamed and scored in browser memory only.</p>
@@ -223,6 +223,7 @@ export default function Home() {
       <button onClick={() => exportCSV(`${slot}-${roleId}-rankings.csv`, rankings, rankingScores)}>Export CSV</button><button onClick={() => exportHTML(`${slot}-${roleId}-rankings.html`, rankings, rankingScores)}>Export HTML</button></div></>}</section>
       <RankTable players={rankings.slice(0, 500)} total={rankings.length} scores={rankingScores} compareIds={compareIds} sort={sort} onOpen={setSelected} onCompare={toggleCompare} /></section>}
     {tab === "compare" && <Comparison players={compared} onExport={() => exportCSV("fm-recruitment-comparison.csv", compared)} />}
+    {tab === "instructions" && <Instructions />}
     {tab === "settings" && <Settings onExport={() => exportCSV("fm-recruitment-full-scored-dataset.csv", players)} />}
     {selected && <PlayerModal player={selected} slot={slot} roleId={roleId} onClose={() => setSelected(null)} />}
     <div className="app-version">{APP_VERSION}</div>
@@ -248,6 +249,23 @@ function Comparison({ players, onExport }: { players: ScoredPlayer[]; onExport: 
 }
 function Settings({ onExport }: { onExport: () => void }) {
   return <section className="panel settings"><span className="eyebrow">Scoring transparency</span><h2>{PRESET_VERSION}</h2><p>Role Score is pure role fit: 70% attributes, 15% position/foot, 10% hidden/profile and 5% shrunken stats. Recruitment Score adds market value, wage and age/development.</p><button onClick={onExport}>Export full scored dataset CSV</button>{Object.values(ROLE_CONFIG).map((role) => <details key={role.id}><summary><strong>{role.shortName}</strong> · {role.label}</summary><p><b>Attribute weights:</b> {Object.entries(role.attributeWeights).map(([key, weight]) => `${key} ${weight}`).join(", ")}</p><p><b>Positive stats:</b> {Object.entries(role.positiveStatWeights).map(([key, weight]) => `${key} ${weight}`).join(", ")}</p><p><b>Floor penalties:</b> {role.floorPenalties.map((p) => `${p.attribute}<${p.lt}: -${p.minus}`).join(", ") || "None"}</p></details>)}</section>;
+}
+function Instructions() {
+  const exportColumns = ["Name", "Age", "DOB", "UID", "Club", "Nation", "Position", "Preferred Foot", "Left Foot", "Right Foot", "Height", "Transfer Value", "Wage", "Minutes", "Av Rat", "all visible attributes", "relevant per-90 stats"];
+  return <section className="panel instructions-panel"><div className="instructions-hero"><span className="eyebrow">How to use</span><h2>FM Recruitment Lab instructions</h2><p>Use the default database for quick scouting, or export an HTML player search from Football Manager and analyse it privately in your browser.</p></div>
+    <div className="instruction-grid">
+      <article><span className="step-number">01</span><h3>Use the default database</h3><p>The app will try to load the default R2 database automatically. If it does not, open Import and press Load Default Database. Refresh Default Database downloads the newest R2 version and replaces the browser cache.</p></article>
+      <article><span className="step-number">02</span><h3>Build an FM player search</h3><p>In Football Manager, open Scouting or Player Search, expand the search scope as needed, and add the columns you want exported. The app works best when attributes, positions, value, wage, minutes and performance stats are visible.</p></article>
+      <article><span className="step-number">03</span><h3>Export HTML from FM</h3><p>With the player list visible, use the FM menu to print/export the current view as a Web Page or HTML file. Save it somewhere easy to find, then upload that .html file in the Import tab.</p></article>
+      <article><span className="step-number">04</span><h3>Open rankings</h3><p>Choose a tactic position, then use Best Role Fit for pure football suitability. Best Signing / Value brings cost, wage and age into the decision, but cheap players should not beat elite fits unless their role score is strong.</p></article>
+    </div>
+    <div className="instruction-section"><h3>Recommended export columns</h3><div className="column-chip-list">{exportColumns.map((item) => <span key={item}>{item}</span>)}</div><p>Missing columns are allowed. Missing attributes are excluded from weighted attribute scoring and shown as warnings rather than treated as zero.</p></div>
+    <div className="instruction-split">
+      <div><h3>Understanding the scores</h3><ul><li><strong>Role Score</strong> is pure role fit from attributes, position/foot, hidden profile and shrunken stats.</li><li><strong>Recruitment Score</strong> adds market value, wage and age/development for signing decisions.</li><li><strong>Confidence Score</strong> reflects minutes, missing data, hidden/profile availability and position certainty.</li><li><strong>Adjusted Stats</strong> pulls tiny samples back toward 50 so low-minute players do not jump unfairly.</li></ul></div>
+      <div><h3>Common workflow</h3><ol><li>Load the default database or upload your latest FM HTML export.</li><li>Open Tactic and choose a role/slot.</li><li>Use Position and Role suitability filters to remove unsuitable players.</li><li>Open a player profile to inspect attributes, score breakdown, STAG stats and warnings.</li><li>Export CSV/HTML when you want to shortlist or compare outside the app.</li></ol></div>
+    </div>
+    <div className="instruction-section"><h3>Useful notes</h3><p>Not for sale means the club does not want to sell; it is not treated as a missing or zero value. Value ranges use the midpoint for display and scoring. Player faces, club logos and nation logos are loaded from the Cloudflare R2 asset bucket when a UID/path match exists.</p></div>
+  </section>;
 }
 function PlayerModal({ player, roleId, slot, onClose }: { player: ScoredPlayer; roleId: RoleId; slot: SlotId; onClose: () => void }) {
   const [profileTab, setProfileTab] = useState<ModalTab>("Attributes");

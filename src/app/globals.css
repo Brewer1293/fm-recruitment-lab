@@ -407,6 +407,83 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
 .settings details, .validation details { border-top: 1px solid var(--line); padding: 10px 0; }
 .settings summary, .validation summary { cursor: pointer; }
 
+.instructions-panel {
+  display: grid;
+  gap: 12px;
+  max-width: 1180px;
+}
+.instructions-hero {
+  background: rgb(43,43,43);
+  background-image: var(--row-paper);
+  border-left: 3px solid var(--orange);
+  padding: 12px;
+}
+.instructions-hero h2 {
+  margin-top: 3px;
+  text-transform: uppercase;
+}
+.instruction-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.instruction-grid article,
+.instruction-section,
+.instruction-split > div {
+  background: rgb(43,43,43);
+  background-image: var(--row-paper);
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 2px;
+  padding: 12px;
+}
+.step-number {
+  color: var(--orange);
+  display: block;
+  font-family: "Scoreboard FM", "GT FM", Arial, sans-serif;
+  font-size: 22px;
+  line-height: 1;
+  margin-bottom: 8px;
+}
+.instructions-panel h3 {
+  color: rgb(255,248,238);
+  font-family: "GT FM", "Proxima FM", Arial, sans-serif;
+  font-size: 15px;
+  margin: 0 0 7px;
+  text-transform: uppercase;
+}
+.instructions-panel p,
+.instructions-panel li {
+  color: rgba(255,248,238,.72);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.instructions-panel ul,
+.instructions-panel ol {
+  margin: 8px 0 0;
+  padding-left: 20px;
+}
+.instructions-panel li + li { margin-top: 7px; }
+.instructions-panel strong { color: rgb(255,248,238); }
+.column-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 10px 0;
+}
+.column-chip-list span {
+  background: rgba(25,25,25,.62);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 7px;
+  color: rgba(255,248,238,.82);
+  font-size: 12px;
+  padding: 6px 8px;
+}
+.instruction-split {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .backdrop {
   align-items: center;
   background: rgba(0, 0, 0, 0.78);
@@ -1095,6 +1172,7 @@ code { color: var(--orange-2); }
   nav .clear { position: static; }
   .tactic-wrap { grid-template-columns: 1fr; overflow: auto; }
   .filter-grid { grid-template-columns: repeat(2, 1fr); }
+  .instruction-grid, .instruction-split { grid-template-columns: 1fr; }
   .pitch { min-width: 520px; }
   .profile-grid.compact, .attribute-groups { grid-template-columns: 1fr; }
   .fm-profile-top, .fm-profile-body, .fm-bottom-panels, .info-tab, .contract-tab, .medical-tab { grid-template-columns: 1fr; }
