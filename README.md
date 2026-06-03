@@ -15,6 +15,7 @@ Live app: `https://fmapp.brewerlabs.uk/`
 - Provides FM-style player profiles, STAG stat baselines, comparison tools, import validation and export options.
 - Includes a Settings theme picker for orange, blue and emerald accent styles.
 - Shows the loaded-dataset players used as STAG baselines for each tactic role and metric.
+- Applies league coefficient weighting to performance metrics and STAG baselines when league/division data is exported.
 
 ## Privacy Model
 
@@ -74,6 +75,12 @@ https://assets.brewerlabs.uk/datasets
 
 The browser checks `default-metadata.json`, downloads the referenced compressed dataset, decompresses it locally and caches it in IndexedDB. **Refresh database** forces a new download when the R2 dataset has changed.
 
+R2 CORS is tracked in `cloudflare-r2-cors.json`. Reapply it after changing preview ports:
+
+```bash
+npx wrangler r2 bucket cors set fm-assets --file cloudflare-r2-cors.json
+```
+
 ## Graphic Assets
 
 Graphic assets are resolved from:
@@ -124,6 +131,8 @@ adjustedStatsScore = 50 + ((rawStatsScore - 50) * minutesConfidence)
 ```
 
 Small samples are pulled back toward 50 so low-minute players do not jump above elite players on per-90 noise.
+
+Performance metrics are also adjusted by league coefficient before scoring. Positive metrics are multiplied by the coefficient; negative/error metrics are divided by it, so output from weaker leagues needs more raw production to compare with top-league output.
 
 ## Missing Data
 

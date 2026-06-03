@@ -6,7 +6,16 @@ Update this file before each live push to the standalone FM app.
 
 ## Unreleased
 
-- No unreleased changes.
+- Added league coefficient weighting to performance metrics, STAG score impacts and loaded-dataset STAG baselines.
+- Added the R2 bucket CORS config used by the default database and local preview ports.
+- Tightened STAG baselines so they are calibrated from top role-fit players, with robust high-percentile handling for volatile percentage metrics.
+- Restricted STAG baselines to players whose primary exported position matches the tactic slot, preventing secondary-position hybrids from setting unrelated metric baselines.
+- Contained Settings and player-profile STAG tables so wide metric data scrolls inside the table instead of spilling off-screen.
+- Made full-back role scoring side-specific for LB/RB slots and reset Scouting sorting to Role Score when changing tactic slots.
+- Made Role position only the default Scouting filter and added position-fit score caps so weak conversions cannot rank near the top.
+- Made Role position only require the player's primary exported position group and reduced secondary-position BPD fits from natural to competent.
+- Made BPD/CB stricter by downgrading centre-back plus central-midfield hybrids from natural CB fit.
+- Prioritised left-footed players at LB/LCB and right-footed players at RB/RCB, while keeping inside forwards inverted-foot aware.
 
 ## Live History
 

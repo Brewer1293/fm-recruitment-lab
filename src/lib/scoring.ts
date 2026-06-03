@@ -1,3 +1,4 @@
+import { adjustedNegativeMetric, adjustedPositiveMetric, leagueCoefficient } from "./leagueCoefficients";
 import { RECRUITMENT_SCORE_WEIGHTS, ROLE_CONFIG, ROLE_SCORE_WEIGHTS } from "./roleConfig";
 import type { NormalizedPlayer, RoleConfig, RoleId, RoleScore, ScorePart, ScoredPlayer, SlotId } from "./types";
 
@@ -38,17 +39,18 @@ function attributeScore(player: NormalizedPlayer, config: RoleConfig) {
 
 function statsScore(player: NormalizedPlayer, config: RoleConfig) {
   let total = 0, weight = 0, available = 0;
+  const league = leagueCoefficient(player);
   for (const [key, rawWeight] of Object.entries(config.positiveStatWeights)) {
     const target = statTargets[key], value = target ? valueOf(player, target[0]) : undefined;
     if (value === undefined) continue;
-    total += clamp(value / target[1] * 100) * rawWeight;
+    total += clamp(adjustedPositiveMetric(value, league.coefficient) / target[1] * 100) * rawWeight;
     weight += rawWeight;
     available += 1;
   }
   let raw = weight ? total / weight : 50;
   for (const [key, rawWeight] of Object.entries(config.negativeStatPenalties)) {
     const target = statTargets[key], value = target ? valueOf(player, target[0]) : undefined;
-    if (value !== undefined) raw -= clamp(value / target[1] * 100) * rawWeight;
+    if (value !== undefined) raw -= clamp(adjustedNegativeMetric(value, league.coefficient) / target[1] * 100) * rawWeight;
   }
   raw = clamp(raw);
   const confidence = minutesConfidence(Number(player.minutes ?? 0));
@@ -72,6 +74,11 @@ function parsedPositions(player: NormalizedPlayer) {
   return out;
 }
 
+function primaryParsedPositions(player: NormalizedPlayer) {
+  const raw = String(player.position ?? "").split(",")[0] ?? "";
+  return parsedPositions({ ...player, position: raw });
+}
+
 function footStrength(value: unknown) {
   const text = String(value ?? "").toLowerCase();
   if (/very strong|strong|fairly strong|right only|left only/.test(text)) return 3;
@@ -82,25 +89,40 @@ function footStrength(value: unknown) {
 
 function positionScore(player: NormalizedPlayer, config: RoleConfig, slot?: SlotId) {
   const positions = parsedPositions(player);
-  const wanted = config.positions.some((position) => positions.has(position));
+  const primaryPositions = primaryParsedPositions(player);
+  const wantedPositions = config.id === "fb-at"
+    ? (slot === "RB" ? ["DR"] : ["DL"])
+    : config.id === "if-su"
+      ? (slot === "RW" ? ["AMR"] : ["AML"])
+      : config.positions;
+  const wingBackPositions = config.id === "fb-at" ? (slot === "RB" ? ["WBR"] : ["WBL"]) : [];
+  const wanted = wantedPositions.some((position) => positions.has(position));
+  const primaryWanted = wantedPositions.some((position) => primaryPositions.has(position));
+  const centralMidfieldHybrid = positions.has("MC");
   let score = wanted ? 100 : 0;
   let familiarity = wanted ? "Natural" : "NotSuitable";
+  if (config.id === "bpd-de" && wanted && (!primaryWanted || centralMidfieldHybrid)) {
+    score = 72;
+    familiarity = "Competent";
+  }
   if (!wanted && config.id === "af-at") {
     if (positions.has("AMC")) { score = 55; familiarity = "Untrained"; }
     else if (positions.has("AML") || positions.has("AMR")) { score = 45; familiarity = "PlausibleConversion"; }
   } else if (!wanted && config.id === "if-su" && (positions.has("ST") || positions.has("AMC"))) {
     score = 45; familiarity = "PlausibleConversion";
-  } else if (!wanted && config.id === "fb-at" && (positions.has("WBL") || positions.has("WBR"))) {
+  } else if (!wanted && config.id === "fb-at" && wingBackPositions.some((position) => positions.has(position))) {
     score = 95; familiarity = "Accomplished";
   }
 
   const left = footStrength(player.leftFoot), right = footStrength(player.rightFoot), either = left >= 2 && right >= 2;
   const activeRule = config.id === "fb-at" ? (slot === "RB" ? "FB_AT_RB" : "FB_AT_LB") : config.id === "if-su" ? (slot === "RW" ? "IF_SU_RW" : "IF_SU_LW") : config.footRule;
   let multiplier = 1;
-  if (activeRule === "FB_AT_LB") multiplier = either ? 0.99 : left >= 2 ? 1 : left >= 1 ? 0.93 : 0.88;
-  else if (activeRule === "FB_AT_RB") multiplier = either ? 0.99 : right >= 2 ? 1 : right >= 1 ? 0.93 : 0.88;
-  else if (activeRule === "IF_SU_LW") multiplier = either ? 0.99 : right >= 2 ? 1 : 0.92;
-  else if (activeRule === "IF_SU_RW") multiplier = either ? 0.99 : left >= 2 ? 1 : 0.92;
+  if (activeRule === "FB_AT_LB") multiplier = either ? 1.01 : left >= 2 ? 1 : left >= 1 ? 0.93 : 0.88;
+  else if (activeRule === "FB_AT_RB") multiplier = either ? 1.01 : right >= 2 ? 1 : right >= 1 ? 0.93 : 0.88;
+  else if (activeRule === "IF_SU_LW") multiplier = either ? 1.01 : right >= 2 ? 1 : right >= 1 ? 0.94 : 0.9;
+  else if (activeRule === "IF_SU_RW") multiplier = either ? 1.01 : left >= 2 ? 1 : left >= 1 ? 0.94 : 0.9;
+  else if (activeRule === "BPD_SIDE_AWARE" && slot === "LCB") multiplier = either ? 1.01 : left >= 2 ? 1 : left >= 1 ? 0.97 : 0.94;
+  else if (activeRule === "BPD_SIDE_AWARE" && slot === "RCB") multiplier = either ? 1.01 : right >= 2 ? 1 : right >= 1 ? 0.97 : 0.94;
   else if (activeRule === "CENTRAL_NEUTRAL_PLUS_TWO_FOOT") multiplier = either ? 1.02 : 1;
   else if (activeRule === "CENTRAL_NEUTRAL" || activeRule === "BPD_SIDE_AWARE") multiplier = either ? 1.01 : 1;
   return { part: part(clamp(score * multiplier), player.position ? 1 : 0, 1), familiarity };
@@ -152,9 +174,24 @@ function applyCaps(player: NormalizedPlayer, config: RoleConfig, roleScore: numb
 }
 
 export function scorePlayer(player: NormalizedPlayer, roleId: RoleId, slot?: SlotId): RoleScore {
+  const league = leagueCoefficient(player);
   const config = ROLE_CONFIG[roleId], attribute = attributeScore(player, config), stats = statsScore(player, config), hidden = hiddenScore(player), position = positionScore(player, config, slot);
   const preCapRole = clamp((attribute.score ?? 50) * ROLE_SCORE_WEIGHTS.attribute + (position.part.score ?? 0) * ROLE_SCORE_WEIGHTS.positionFoot + (hidden.score ?? 50) * ROLE_SCORE_WEIGHTS.hidden + (stats.adjusted.score ?? 50) * ROLE_SCORE_WEIGHTS.stats);
-  const capped = applyCaps(player, config, preCapRole, position.familiarity);
+  const positionValue = position.part.score ?? 0;
+  const positionCaps: string[] = [];
+  let positionCappedRole = preCapRole;
+  if (positionValue <= 0) {
+    positionCappedRole = Math.min(positionCappedRole, 45);
+    positionCaps.push("Role score capped at 45: not suitable for selected position");
+  } else if (positionValue < 60) {
+    positionCappedRole = Math.min(positionCappedRole, 55);
+    positionCaps.push("Role score capped at 55: weak position fit");
+  } else if (positionValue < 80) {
+    positionCappedRole = Math.min(positionCappedRole, 65);
+    positionCaps.push("Role score capped at 65: conversion position fit");
+  }
+  const capped = applyCaps(player, config, positionCappedRole, position.familiarity);
+  capped.caps.unshift(...positionCaps);
   const value = marketValue(player, capped.score), wage = wageScore(player, capped.score), age = ageDevelopment(player, config);
   const recruitment = clamp(capped.score * RECRUITMENT_SCORE_WEIGHTS.role + (value.score ?? 50) * RECRUITMENT_SCORE_WEIGHTS.marketValue + (wage.score ?? 50) * RECRUITMENT_SCORE_WEIGHTS.wage + (age.score ?? 50) * RECRUITMENT_SCORE_WEIGHTS.ageDevelopment);
   const confidence = clamp(minutesConfidence(Number(player.minutes ?? 0)) * 45 + (attribute.available / Math.max(attribute.expected, 1)) * 20 + (stats.adjusted.available / Math.max(stats.adjusted.expected, 1)) * 15 + (hidden.available ? 10 : 0) + ((position.part.score ?? 0) / 100) * 10);
@@ -175,7 +212,7 @@ export function scorePlayer(player: NormalizedPlayer, roleId: RoleId, slot?: Slo
     strengths: keyAttributes.slice(0, 4).map((item) => `${item.key} ${item.value}`),
     weaknesses: keyAttributes.slice(-4).filter((item) => item.value < 12).map((item) => `${item.key} ${item.value}`),
     warnings: [...new Set(warnings)],
-    explanation: [`Role Score is pure role suitability.`, `Stats shrink from ${stats.raw.toFixed(1)} to ${(stats.adjusted.score ?? 50).toFixed(1)} using minutes confidence ${minutesConfidence(Number(player.minutes ?? 0)).toFixed(2)}.`, `Value, wage and age affect Recruitment Score only.`],
+    explanation: [`Role Score is pure role suitability.`, `Performance stats use ${league.label} coefficient ${league.coefficient.toFixed(2)} before minutes shrinkage.`, `Stats shrink from ${stats.raw.toFixed(1)} to ${(stats.adjusted.score ?? 50).toFixed(1)} using minutes confidence ${minutesConfidence(Number(player.minutes ?? 0)).toFixed(2)}.`, `Value, wage and age affect Recruitment Score only.`],
   };
 }
 

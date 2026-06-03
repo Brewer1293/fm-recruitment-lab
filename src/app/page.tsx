@@ -5,6 +5,7 @@ import { exportCSV, exportHTML } from "../lib/exports";
 import { clubLogoUrl, nationLogoUrl, playerFaceUrl } from "../lib/assetResolver";
 import { clearCachedDefaultDataset, loadDefaultDataset } from "../lib/defaultDataset";
 import { importFMFiles } from "../lib/fmParser";
+import { adjustedNegativeMetric, adjustedPositiveMetric, leagueCoefficient } from "../lib/leagueCoefficients";
 import { PRESET_VERSION, ROLE_CONFIG, TACTIC_SLOTS } from "../lib/roleConfig";
 import { scoreForSlot, scorePlayers } from "../lib/scoring";
 import type { RoleId, RoleScore, ScoredPlayer, SlotId, ValidationReport } from "../lib/types";
@@ -14,7 +15,7 @@ type SortKey = "roleScore" | "recruitmentScore" | "confidenceScore" | "attribute
 type SuitabilityFilter = "role-position" | "conversion" | "all";
 type PositionFilter = "" | "GK" | "DL" | "DC" | "DR" | "WBL" | "WBR" | "DM" | "ML" | "MC" | "MR" | "AML" | "AMC" | "AMR" | "ST";
 type ThemeChoice = "orange" | "blue" | "emerald";
-const APP_VERSION = "v0.2.22-stag-baselines";
+const APP_VERSION = "v0.2.29-side-foot-preference";
 const THEME_STORAGE_KEY = "fm-recruitment-lab-theme";
 const THEME_OPTIONS: { value: ThemeChoice; label: string; description: string }[] = [
   { value: "orange", label: "Classic Orange", description: "The current FM Lab orange accent." },
@@ -101,9 +102,13 @@ const STAT_TARGETS: Record<string, { field: string; target: number; label: strin
   shotConversionPct: { field: "conversionPercentage", target: 22, label: "Shot Conversion", suffix: "%", dp: 0 },
   errorsLeadingToGoal90: { field: "errorsLeadingToGoal90", target: 0.25, label: "Errors Leading to Goal per 90" },
 };
-type StagBaselinePlayer = { id: string; name: string; club?: string; nationality?: string; minutes?: number; value: number };
+type StagBaselinePlayer = { id: string; name: string; club?: string; nationality?: string; division?: string; minutes?: number; rawValue: number; adjustedValue: number; coefficient: number; leagueLabel: string };
 type StagBenchmark = { metricKey: string; roleId: RoleId; slot: SlotId; type: "positive" | "penalty"; source: "dataset" | "fixed"; sample: number; minutes: number; benchmark: number; thresholds: number[]; baselinePlayer?: StagBaselinePlayer };
 type StagBenchmarkMap = Record<string, StagBenchmark>;
+const BASELINE_MIN_ROLE_SCORE = 65;
+const BASELINE_MIN_QUALIFIED_PLAYERS = 20;
+const BASELINE_TOP_ROLE_POOL = 75;
+const VOLATILE_BASELINE_METRICS = new Set(["shotConversionPct", "headersWonPct"]);
 const isGoalkeeper = (player: ScoredPlayer) => positionCodes(player.position).has("GK");
 const textValue = (value: unknown) => value === undefined || value === null || value === "" ? "-" : String(value);
 const field = (player: ScoredPlayer, ...keys: string[]) => {
@@ -129,6 +134,19 @@ const statValue = (player: ScoredPlayer, key: string, dp = 2, suffix = "") => ty
 const clampScore = (value: number) => Math.min(100, Math.max(0, value));
 const minutesConfidence = (minutes = 0) => minutes <= 90 ? 0.1 : minutes <= 180 ? 0.2 : minutes <= 300 ? 0.35 : minutes <= 600 ? 0.55 : minutes <= 900 ? 0.75 : minutes <= 1500 ? 0.9 : 1;
 const benchmarkKey = (slot: SlotId, roleId: RoleId, metricKey: string, type: "positive" | "penalty") => `${slot}:${roleId}:${metricKey}:${type}`;
+const slotPositionCode = (slot: SlotId) => ({
+  GK: "GK",
+  LB: "DL",
+  LCB: "DC",
+  RCB: "DC",
+  RB: "DR",
+  LDM: "DM",
+  RDM: "DM",
+  LW: "AML",
+  AMC: "AMC",
+  RW: "AMR",
+  ST: "ST",
+})[slot];
 const POSITION_CODE_CACHE = new Map<string, Set<string>>();
 function positionCodes(position?: string) {
   const text = String(position ?? "").toUpperCase().replace(/\s+/g, "");
@@ -153,7 +171,12 @@ function positionCodes(position?: string) {
   POSITION_CODE_CACHE.set(text, out);
   return out;
 }
+function primaryPositionCodes(position?: string) {
+  const firstGroup = String(position ?? "").split(",")[0] ?? "";
+  return positionCodes(firstGroup);
+}
 const matchesPosition = (player: ScoredPlayer, filter: PositionFilter) => !filter || positionCodes(player.position).has(filter);
+const slotPrimaryPositionMatches = (player: ScoredPlayer, slot: SlotId) => primaryPositionCodes(player.position).has(slotPositionCode(slot));
 
 export default function Home() {
   const [tab, setTab] = useState<Tab>("import"), [players, setPlayers] = useState<ScoredPlayer[]>([]);
@@ -164,7 +187,7 @@ export default function Home() {
   const [selected, setSelected] = useState<ScoredPlayer | null>(null), [compareIds, setCompareIds] = useState<string[]>([]);
   const [search, setSearch] = useState(""), [minMinutes, setMinMinutes] = useState(0), [maxAge, setMaxAge] = useState(50);
   const [minAge, setMinAge] = useState(0), [club, setClub] = useState(""), [nation, setNation] = useState(""), [positionFilter, setPositionFilter] = useState<PositionFilter>(""), [foot, setFoot] = useState("");
-  const [suitabilityFilter, setSuitabilityFilter] = useState<SuitabilityFilter>("all");
+  const [suitabilityFilter, setSuitabilityFilter] = useState<SuitabilityFilter>("role-position");
   const [maxWage, setMaxWage] = useState(1000), [maxValue, setMaxValue] = useState(500), [minScore, setMinScore] = useState(0);
   const [includeMissingStats, setIncludeMissingStats] = useState(true), [includeMissingHidden, setIncludeMissingHidden] = useState(true);
   const [sortKey, setSortKey] = useState<SortKey>("roleScore"), [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
@@ -175,7 +198,8 @@ export default function Home() {
   const rankings = useMemo(() => players.filter((player) => {
     const score = rankingScores.get(player.id)!;
     const valuePass = player.transferValueStatus === "not_for_sale" || Number(player.valueM ?? 0) <= maxValue;
-    const positionPass = suitabilityFilter === "all" || Number(score.position.score ?? 0) >= (suitabilityFilter === "conversion" ? 45 : 80);
+      const positionScoreValue = Number(score.position.score ?? 0);
+      const positionPass = suitabilityFilter === "all" || (suitabilityFilter === "conversion" ? positionScoreValue >= 45 : positionScoreValue >= 80 && slotPrimaryPositionMatches(player, slot));
     return `${player.name} ${player.club ?? ""}`.toLowerCase().includes(search.toLowerCase()) &&
       Number(player.minutes ?? 0) >= minMinutes && Number(player.age ?? 0) >= minAge && Number(player.age ?? 0) <= maxAge &&
       String(player.club ?? "").toLowerCase().includes(club.toLowerCase()) && String(player.nationality ?? "").toLowerCase().includes(nation.toLowerCase()) &&
@@ -228,7 +252,15 @@ export default function Home() {
       setError(reason instanceof Error ? reason.message : String(reason));
     } finally { setBusy(false); }
   }
-  function selectSlot(nextSlot: SlotId, nextRole: RoleId) { setSlot(nextSlot); setRoleId(nextRole); setTab("rankings"); }
+  function selectSlot(nextSlot: SlotId, nextRole: RoleId) {
+    setSlot(nextSlot);
+    setRoleId(nextRole);
+    setSortKey("roleScore");
+    setSortDirection("desc");
+    setSuitabilityFilter("role-position");
+    setSelected(null);
+    setTab("rankings");
+  }
   function toggleCompare(id: string) { setCompareIds((current) => current.includes(id) ? current.filter((value) => value !== id) : current.length < 4 ? [...current, id] : current); }
   function clearData() { setPlayers([]); setReport(null); setCompareIds([]); setSelected(null); setTab("import"); }
   function sort(next: SortKey) { if (sortKey === next) setSortDirection((value) => value === "desc" ? "asc" : "desc"); else { setSortKey(next); setSortDirection("desc"); } }
@@ -314,13 +346,13 @@ function Settings({ report, theme, benchmarks, onThemeChange, onTactic, onExport
 }
 function BaselineSettings({ benchmarks }: { benchmarks: StagBenchmarkMap }) {
   const hasDatasetBenchmarks = Object.values(benchmarks).some((benchmark) => benchmark.source === "dataset");
-  return <section className="settings-block baseline-settings"><div><h3>STAG baselines</h3><p>See which loaded-dataset players are setting the STAG benchmark for each tactic role and metric. Positive metrics use the best qualifying player; negative metrics use the lowest qualifying error rate.</p></div><div>{!hasDatasetBenchmarks ? <p className="empty-note">Load a player database to calculate dataset baselines. Until then, STAG tiers use fixed fallback targets.</p> : <div className="baseline-role-list">{TACTIC_SLOTS.map((item) => {
+  return <section className="settings-block baseline-settings"><div><h3>STAG baselines</h3><p>See which top primary-position role-fit players are setting the league-adjusted STAG benchmark for each tactic position and metric. Positive metrics are multiplied by league coefficient; negative/error metrics are divided by it.</p></div><div>{!hasDatasetBenchmarks ? <p className="empty-note">Load a player database to calculate dataset baselines. Until then, STAG tiers use fixed fallback targets.</p> : <div className="baseline-role-list">{TACTIC_SLOTS.map((item) => {
     const role = ROLE_CONFIG[item.roleId];
     const metricEntries = [...Object.keys(role.positiveStatWeights).map((metricKey) => [metricKey, "positive"] as const), ...Object.keys(role.negativeStatPenalties).map((metricKey) => [metricKey, "penalty"] as const)];
     const rows = metricEntries.map(([metricKey, type]) => ({ metricKey, type, metric: STAT_TARGETS[metricKey], benchmark: benchmarks[benchmarkKey(item.id, role.id, metricKey, type)] })).filter((row) => row.metric && row.benchmark);
-    return <details key={item.id} className="baseline-role"><summary><strong>{item.id} · {roleDisplayName(role)}</strong></summary><div className="table-scroll"><table className="baseline-table"><thead><tr><th>Metric</th><th>Baseline player</th><th>Club</th><th>Value</th><th>Elite</th><th>Sample</th><th>Mins</th></tr></thead><tbody>{rows.map((row) => {
+    return <details key={item.id} className="baseline-role"><summary><strong>{item.id} · {roleDisplayName(role)}</strong></summary><div className="table-scroll"><table className="baseline-table"><thead><tr><th>Metric</th><th>Baseline player</th><th>Club</th><th>League</th><th>Coeff</th><th>Raw</th><th>Adjusted</th><th>Elite</th><th>Sample</th><th>Mins</th></tr></thead><tbody>{rows.map((row) => {
       const player = row.benchmark?.baselinePlayer;
-      return <tr key={`${item.id}-${row.type}-${row.metricKey}`}><td><strong>{row.metric?.label ?? row.metricKey}</strong><small>{row.type === "penalty" ? "Lower is better" : "Higher is better"}</small></td><td>{player?.name ?? (row.benchmark?.source === "fixed" ? "Fixed fallback" : "-")}<small>{player?.nationality ?? ""}</small></td><td>{player?.club ?? "-"}</td><td>{row.metric ? formatStatNumber(player?.value ?? row.benchmark?.benchmark ?? 0, row.metric) : "-"}</td><td>{row.metric && row.benchmark ? formatStatNumber(row.benchmark.thresholds[3], row.metric) : "-"}</td><td>{row.benchmark?.source === "dataset" ? row.benchmark.sample.toLocaleString() : "Fallback"}</td><td>{row.benchmark?.source === "dataset" ? `${row.benchmark.minutes}+` : "-"}</td></tr>;
+      return <tr key={`${item.id}-${row.type}-${row.metricKey}`}><td><strong>{row.metric?.label ?? row.metricKey}</strong><small>{row.type === "penalty" ? "Lower is better" : "Higher is better"}</small></td><td>{player?.name ?? (row.benchmark?.source === "fixed" ? "Fixed fallback" : "-")}<small>{player?.nationality ?? ""}</small></td><td>{player?.club ?? "-"}</td><td>{player?.leagueLabel ?? "-"}</td><td>{player ? player.coefficient.toFixed(2) : "-"}</td><td>{row.metric && player ? formatStatNumber(player.rawValue, row.metric) : "-"}</td><td>{row.metric ? formatStatNumber(player?.adjustedValue ?? row.benchmark?.benchmark ?? 0, row.metric) : "-"}</td><td>{row.metric && row.benchmark ? formatStatNumber(row.benchmark.thresholds[3], row.metric) : "-"}</td><td>{row.benchmark?.source === "dataset" ? row.benchmark.sample.toLocaleString() : "Fallback"}</td><td>{row.benchmark?.source === "dataset" ? `${row.benchmark.minutes}+` : "-"}</td></tr>;
     })}</tbody></table></div></details>;
   })}</div>}</div></section>;
 }
@@ -424,6 +456,10 @@ function formatStatMetric(player: ScoredPlayer, metric: { field: string; suffix?
 function formatStatNumber(value: number, metric: { suffix?: string; dp?: number }) {
   return `${value.toFixed(metric.dp ?? 2).replace(/\.00$/, "")}${metric.suffix ?? ""}`;
 }
+function adjustedMetricValue(value: number | undefined, type: "positive" | "penalty", coefficient: number) {
+  if (value === undefined) return undefined;
+  return type === "penalty" ? adjustedNegativeMetric(value, coefficient) : adjustedPositiveMetric(value, coefficient);
+}
 function formatSignedStat(value: number, metric: { suffix?: string; dp?: number }) {
   const sign = value > 0 ? "+" : "";
   return `${sign}${formatStatNumber(value, metric)}`;
@@ -437,23 +473,52 @@ function fixedBenchmark(slot: SlotId, roleId: RoleId, metricKey: string, type: "
   const ratios = type === "penalty" ? [2.5, 1.75, 1.2, 1] : [0.55, 0.75, 0.9, 1];
   return { metricKey, roleId, slot, type, source: "fixed", sample: 0, minutes: 0, benchmark: metric.target, thresholds: ratios.map((ratio) => metric.target * ratio) };
 }
+function baselinePercentile(metricKey: string, type: "positive" | "penalty") {
+  if (type === "penalty") return 0.1;
+  return VOLATILE_BASELINE_METRICS.has(metricKey) ? 0.98 : 0.995;
+}
+function representativeBaselineEntry<T extends { adjustedValue: number }>(entries: T[], benchmark: number, type: "positive" | "penalty") {
+  if (type === "penalty") return entries.find((entry) => entry.adjustedValue >= benchmark) ?? entries[0];
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    if (entries[index].adjustedValue <= benchmark) return entries[index];
+  }
+  return entries[entries.length - 1];
+}
 function buildStagBenchmarks(players: ScoredPlayer[]): StagBenchmarkMap {
   const out: StagBenchmarkMap = {};
   for (const item of TACTIC_SLOTS) {
     const role = ROLE_CONFIG[item.roleId];
-    const candidates = players
-      .map((candidate) => ({ player: candidate, minutes: Number(candidate.minutes ?? 0), suitable: Number(scoreForSlot(candidate, item.roleId, item.id).position.score ?? 0) >= 80 }))
+    const allSuitableCandidates = players
+      .map((candidate) => {
+        const roleScore = scoreForSlot(candidate, item.roleId, item.id);
+        const nativeSlot = primaryPositionCodes(candidate.position).has(slotPositionCode(item.id));
+        return { player: candidate, minutes: Number(candidate.minutes ?? 0), roleScore: roleScore.roleScore, suitable: nativeSlot && Number(roleScore.position.score ?? 0) >= 80 };
+      })
       .filter((candidate) => candidate.suitable);
+    const qualityCandidates = allSuitableCandidates
+      .filter((candidate) => candidate.roleScore >= BASELINE_MIN_ROLE_SCORE)
+      .sort((a, b) => b.roleScore - a.roleScore);
+    const candidates = qualityCandidates.length >= BASELINE_MIN_QUALIFIED_PLAYERS ? qualityCandidates.slice(0, BASELINE_TOP_ROLE_POOL) : allSuitableCandidates;
     const metricEntries = [...Object.keys(role.positiveStatWeights).map((metricKey) => [metricKey, "positive"] as const), ...Object.keys(role.negativeStatPenalties).map((metricKey) => [metricKey, "penalty"] as const)];
     for (const [metricKey, type] of metricEntries) {
       const metric = STAT_TARGETS[metricKey];
       if (!metric) continue;
-      let picked: { entries: { player: ScoredPlayer; value: number }[]; minutes: number } | undefined;
+      let picked: { entries: { player: ScoredPlayer; rawValue: number; adjustedValue: number; coefficient: number; leagueLabel: string }[]; minutes: number } | undefined;
       for (const minutes of [900, 600, 300, 0]) {
         const entries = candidates
           .filter((candidate) => candidate.minutes >= minutes)
-          .map((candidate) => ({ player: candidate.player, value: candidate.player[metric.field] }))
-          .filter((entry): entry is { player: ScoredPlayer; value: number } => typeof entry.value === "number" && Number.isFinite(entry.value));
+          .map((candidate) => {
+            const rawValue = candidate.player[metric.field], league = leagueCoefficient(candidate.player);
+            if (typeof rawValue !== "number" || !Number.isFinite(rawValue)) return undefined;
+            return {
+              player: candidate.player,
+              rawValue,
+              adjustedValue: type === "penalty" ? adjustedNegativeMetric(rawValue, league.coefficient) : adjustedPositiveMetric(rawValue, league.coefficient),
+              coefficient: league.coefficient,
+              leagueLabel: league.label,
+            };
+          })
+          .filter((entry): entry is { player: ScoredPlayer; rawValue: number; adjustedValue: number; coefficient: number; leagueLabel: string } => Boolean(entry));
         if (entries.length >= 5 || (minutes === 0 && entries.length)) {
           picked = { entries, minutes };
           break;
@@ -463,15 +528,26 @@ function buildStagBenchmarks(players: ScoredPlayer[]): StagBenchmarkMap {
         out[benchmarkKey(item.id, item.roleId, metricKey, type)] = fixedBenchmark(item.id, item.roleId, metricKey, type, metric);
         continue;
       }
-      const sortedEntries = picked.entries.sort((a, b) => a.value - b.value);
-      const sorted = sortedEntries.map((entry) => entry.value);
-      const baselineEntry = type === "penalty" ? sortedEntries[0] : sortedEntries[sortedEntries.length - 1];
-      const baselinePlayer = baselineEntry ? { id: baselineEntry.player.id, name: baselineEntry.player.name, club: baselineEntry.player.club, nationality: baselineEntry.player.nationality, minutes: baselineEntry.player.minutes, value: baselineEntry.value } : undefined;
+      const sortedEntries = picked.entries.sort((a, b) => a.adjustedValue - b.adjustedValue);
+      const sorted = sortedEntries.map((entry) => entry.adjustedValue);
+      const benchmark = type === "penalty" ? (percentile(sorted, baselinePercentile(metricKey, type)) ?? metric.target) : (percentile(sorted, baselinePercentile(metricKey, type)) ?? sorted[sorted.length - 1] ?? metric.target);
+      const baselineEntry = representativeBaselineEntry(sortedEntries, benchmark, type);
+      const baselinePlayer = baselineEntry ? {
+        id: baselineEntry.player.id,
+        name: baselineEntry.player.name,
+        club: baselineEntry.player.club,
+        nationality: baselineEntry.player.nationality,
+        division: baselineEntry.player.division,
+        minutes: baselineEntry.player.minutes,
+        rawValue: baselineEntry.rawValue,
+        adjustedValue: baselineEntry.adjustedValue,
+        coefficient: baselineEntry.coefficient,
+        leagueLabel: baselineEntry.leagueLabel,
+      } : undefined;
       if (type === "penalty") {
-        const thresholds = [percentile(sorted, 0.75), percentile(sorted, 0.5), percentile(sorted, 0.25), percentile(sorted, 0.1)].map((value) => value ?? metric.target);
+        const thresholds = [percentile(sorted, 0.75), percentile(sorted, 0.5), percentile(sorted, 0.25), benchmark].map((value) => value ?? metric.target);
         out[benchmarkKey(item.id, item.roleId, metricKey, type)] = { metricKey, roleId: item.roleId, slot: item.id, type, source: "dataset", sample: sorted.length, minutes: picked.minutes, benchmark: thresholds[3], thresholds, baselinePlayer };
       } else {
-        const benchmark = sorted[sorted.length - 1] ?? metric.target;
         out[benchmarkKey(item.id, item.roleId, metricKey, type)] = { metricKey, roleId: item.roleId, slot: item.id, type, source: "dataset", sample: sorted.length, minutes: picked.minutes, benchmark, thresholds: [0.55, 0.75, 0.9, 1].map((ratio) => benchmark * ratio), baselinePlayer };
       }
     }
@@ -494,27 +570,30 @@ function statTierFromThresholds(value: number | undefined, thresholds: number[],
 }
 function benchmarkNote(benchmark: StagBenchmark | undefined) {
   if (!benchmark || benchmark.source === "fixed") return "Fixed fallback benchmark. Load more role-suitable players with minutes for dataset calibration.";
-  return `Dataset benchmark from ${benchmark.sample.toLocaleString()} role-suitable players, ${benchmark.minutes}+ mins${benchmark.baselinePlayer ? `; baseline player: ${benchmark.baselinePlayer.name}` : ""}.`;
+  return `Dataset benchmark from ${benchmark.sample.toLocaleString()} top primary-position role-fit players, ${benchmark.minutes}+ mins${benchmark.baselinePlayer ? `; baseline player: ${benchmark.baselinePlayer.name} (${benchmark.baselinePlayer.leagueLabel} x${benchmark.baselinePlayer.coefficient.toFixed(2)})` : ""}.`;
 }
 function StagStats({ player, activeSlot, benchmarks }: { player: ScoredPlayer; activeSlot: SlotId; benchmarks: StagBenchmarkMap }) {
   const [selectedSlot, setSelectedSlot] = useState<SlotId>(activeSlot);
   const tacticSlot = TACTIC_SLOTS.find((item) => item.id === selectedSlot) ?? TACTIC_SLOTS[0];
   const role = ROLE_CONFIG[tacticSlot.roleId], score = scoreForSlot(player, role.id, tacticSlot.id);
   const confidence = minutesConfidence(Number(player.minutes ?? 0));
+  const league = leagueCoefficient(player);
   const positiveRows = Object.entries(role.positiveStatWeights).map(([key, weight]) => {
-    const metric = STAT_TARGETS[key], value = metric && typeof player[metric.field] === "number" ? player[metric.field] as number : undefined;
+    const metric = STAT_TARGETS[key], rawValue = metric && typeof player[metric.field] === "number" ? player[metric.field] as number : undefined;
+    const value = adjustedMetricValue(rawValue, "positive", league.coefficient);
     const benchmark = metric ? benchmarks[benchmarkKey(tacticSlot.id, role.id, key, "positive")] ?? fixedBenchmark(tacticSlot.id, role.id, key, "positive", metric) : undefined;
     const metricScore = value === undefined || !benchmark ? undefined : clampScore(value / benchmark.benchmark * 100);
     const tier = benchmark ? statTierFromThresholds(value, benchmark.thresholds, "positive") : { label: "Missing", className: "missing", next: undefined };
-    return { key, label: metric?.label ?? key, metric, weight, value, playerValue: metric ? formatStatMetric(player, metric) : "-", benchmark, thresholds: benchmark?.thresholds ?? [], score: metricScore, tier, type: "positive" as const };
+    return { key, label: metric?.label ?? key, metric, weight, value, rawValue, playerValue: metric && value !== undefined ? formatStatNumber(value, metric) : "-", rawPlayerValue: metric && rawValue !== undefined ? `raw ${formatStatNumber(rawValue, metric)} · ${league.label} x${league.coefficient.toFixed(2)}` : "", benchmark, thresholds: benchmark?.thresholds ?? [], score: metricScore, tier, type: "positive" as const };
   });
   const penaltyRows = Object.entries(role.negativeStatPenalties).map(([key, weight]) => {
-    const metric = STAT_TARGETS[key], value = metric && typeof player[metric.field] === "number" ? player[metric.field] as number : undefined;
+    const metric = STAT_TARGETS[key], rawValue = metric && typeof player[metric.field] === "number" ? player[metric.field] as number : undefined;
+    const value = adjustedMetricValue(rawValue, "penalty", league.coefficient);
     const benchmark = metric ? benchmarks[benchmarkKey(tacticSlot.id, role.id, key, "penalty")] ?? fixedBenchmark(tacticSlot.id, role.id, key, "penalty", metric) : undefined;
     const worst = benchmark?.thresholds[0] ?? metric?.target ?? 1;
     const metricScore = value === undefined || !benchmark ? undefined : clampScore(100 - (value / Math.max(worst, 0.01) * 100));
     const tier = benchmark ? statTierFromThresholds(value, benchmark.thresholds, "penalty") : { label: "Missing", className: "missing", next: undefined };
-    return { key, label: metric?.label ?? key, metric, weight, value, playerValue: metric ? formatStatMetric(player, metric) : "-", benchmark, thresholds: benchmark?.thresholds ?? [], score: metricScore, tier, type: "penalty" as const };
+    return { key, label: metric?.label ?? key, metric, weight, value, rawValue, playerValue: metric && value !== undefined ? formatStatNumber(value, metric) : "-", rawPlayerValue: metric && rawValue !== undefined ? `raw ${formatStatNumber(rawValue, metric)} · ${league.label} x${league.coefficient.toFixed(2)}` : "", benchmark, thresholds: benchmark?.thresholds ?? [], score: metricScore, tier, type: "penalty" as const };
   });
   const rows = [...positiveRows, ...penaltyRows];
   const rowWeights = rows.reduce((sum, row) => row.score === undefined ? sum : sum + row.weight, 0);
@@ -523,12 +602,12 @@ function StagStats({ player, activeSlot, benchmarks }: { player: ScoredPlayer; a
   return <section className="fm-tab-panel stats-tab"><div className="fm-role-tabs tactic-stag-tabs">{TACTIC_SLOTS.map((item) => <button key={item.id} type="button" className={selectedSlot === item.id ? "active" : ""} onClick={() => setSelectedSlot(item.id)} title={roleDisplayName(ROLE_CONFIG[item.roleId])}><strong>{item.id}</strong><span>{roleAbbreviation(ROLE_CONFIG[item.roleId])}</span></button>)}</div>
     <div className="stag-summary"><ScorePill label="Minutes" value={Number(player.minutes ?? 0)} dp={0} tone={false} /><ScorePill label="Raw STAG" value={dynamicRawStag} /><ScorePill label="Adjusted STAG" value={dynamicAdjustedStag} /><ScorePill label="Minutes confidence" value={confidence * 100} /><ScorePill label="Inputs" value={(score.stats.available / Math.max(score.stats.expected, 1)) * 100} /></div>
     <h3>{tacticSlot.id} · {roleDisplayName(role)} performance model</h3>
-    <table className="fm-stat-table stag-compare-table"><thead><tr><th>Metric</th><th>Weight</th><th>Player</th><th>Low</th><th>Medium</th><th>High</th><th>Elite</th><th>Tier</th><th>Next step</th><th>Score impact</th></tr></thead><tbody>{rows.map((row) => {
+    <div className="stag-table-scroll"><table className="fm-stat-table stag-compare-table"><thead><tr><th>Metric</th><th>Weight</th><th>Player</th><th>Low</th><th>Medium</th><th>High</th><th>Elite</th><th>Tier</th><th>Next step</th><th>Score impact</th></tr></thead><tbody>{rows.map((row) => {
       const thresholds = row.thresholds, favourableLabel = row.type === "penalty" ? "Lower is better" : "Higher is better";
       const nextGap = row.metric && row.tier.next !== undefined && row.value !== undefined ? row.type === "penalty" ? row.value - row.tier.next : row.tier.next - row.value : undefined;
-      return <tr key={`${row.type}-${row.key}`}><td><strong>{row.label}</strong><small>{favourableLabel}</small></td><td>{(row.weight * 100).toFixed(0)}%</td><td>{row.playerValue}</td>{thresholds.map((threshold, index) => <td key={index}>{row.metric ? formatStatNumber(threshold, row.metric) : "-"}</td>)}<td><span className={`stag-tier ${row.tier.className}`}>{row.tier.label}</span></td><td className={nextGap === undefined ? "baseline-delta missing" : "baseline-delta under"}>{nextGap === undefined || !row.metric ? "-" : formatStatNumber(Math.max(0, nextGap), row.metric)}</td><td className={row.type === "penalty" ? "low" : scoreClass(row.score)}>{row.score === undefined ? "Missing" : `${fmt(row.score, 1)}${row.type === "penalty" ? " penalty" : ""}`}</td></tr>;
-    })}</tbody></table>
-    <p className="muted-tab-note">Tiers are calibrated from this loaded dataset where possible. Positive Elite is the best role-suitable qualified player for that metric; Low/Medium/High are percentages of that benchmark. Negative metrics use low-end dataset thresholds because lower is better. {benchmarkNote(rows[0]?.benchmark)}</p>
+      return <tr key={`${row.type}-${row.key}`}><td><strong>{row.label}</strong><small>{favourableLabel}</small></td><td>{(row.weight * 100).toFixed(0)}%</td><td><strong>{row.playerValue}</strong><small>{row.rawPlayerValue}</small></td>{thresholds.map((threshold, index) => <td key={index}>{row.metric ? formatStatNumber(threshold, row.metric) : "-"}</td>)}<td><span className={`stag-tier ${row.tier.className}`}>{row.tier.label}</span></td><td className={nextGap === undefined ? "baseline-delta missing" : "baseline-delta under"}>{nextGap === undefined || !row.metric ? "-" : formatStatNumber(Math.max(0, nextGap), row.metric)}</td><td className={row.type === "penalty" ? "low" : scoreClass(row.score)}>{row.score === undefined ? "Missing" : `${fmt(row.score, 1)}${row.type === "penalty" ? " penalty" : ""}`}</td></tr>;
+    })}</tbody></table></div>
+    <p className="muted-tab-note">Tiers are calibrated from top primary-position role-fit players in this loaded dataset and league-adjusted before comparison. Positive metrics are multiplied by the league coefficient; negative/error metrics are divided by it. {benchmarkNote(rows[0]?.benchmark)}</p>
   </section>;
 }
 function ScorePill({ label, value, dp = 1, tone = true }: { label: string; value: number; dp?: number; tone?: boolean }) {

@@ -1048,6 +1048,10 @@ tbody tr:hover { background: rgba(var(--accent-rgb),.18); cursor: pointer; }
   padding: 14px;
 }
 
+.settings-block > * {
+  min-width: 0;
+}
+
 .settings-block h3 {
   color: var(--orange-2);
   font-size: 14px;
@@ -1103,12 +1107,14 @@ tbody tr:hover { background: rgba(var(--accent-rgb),.18); cursor: pointer; }
 .baseline-role-list {
   display: grid;
   gap: 8px;
+  min-width: 0;
 }
 
 .baseline-role {
   background: rgba(20,20,20,.28);
   border: 1px solid rgba(255,255,255,.075);
   border-radius: 7px;
+  min-width: 0;
   padding: 0;
 }
 
@@ -1124,18 +1130,27 @@ tbody tr:hover { background: rgba(var(--accent-rgb),.18); cursor: pointer; }
 
 .baseline-table th,
 .baseline-table td {
-  font-size: 12px;
+  font-size: 11px;
+  padding: 7px 8px;
   white-space: nowrap;
 }
 
 .baseline-table td:first-child,
 .baseline-table th:first-child {
-  min-width: 210px;
+  min-width: 175px;
 }
 
 .baseline-table td:nth-child(2),
 .baseline-table th:nth-child(2) {
-  min-width: 190px;
+  min-width: 165px;
+}
+
+.baseline-settings .table-scroll {
+  max-height: none;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: visible;
 }
 
 .instructions-panel {
@@ -1695,6 +1710,16 @@ tbody tr:hover { background: rgba(var(--accent-rgb),.18); cursor: pointer; }
   border-collapse: collapse;
   width: 100%;
 }
+
+.stag-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.stag-compare-table {
+  min-width: 920px;
+}
+
 .fm-stat-table th, .fm-stat-table td, .fm-history-table th, .fm-history-table td {
   border-bottom: 1px solid rgba(255,255,255,.12);
   color: rgb(255,248,238);
