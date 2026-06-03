@@ -13,7 +13,7 @@ type Tab = "tactic" | "rankings" | "import" | "validation" | "compare" | "instru
 type SortKey = "roleScore" | "recruitmentScore" | "confidenceScore" | "attribute" | "stats" | "hidden" | "position" | "value" | "age" | "minutes" | "averageRating";
 type SuitabilityFilter = "role-position" | "conversion" | "all";
 type PositionFilter = "" | "GK" | "DL" | "DC" | "DR" | "WBL" | "WBR" | "DM" | "ML" | "MC" | "MR" | "AML" | "AMC" | "AMR" | "ST";
-const APP_VERSION = "v0.2.16-stag-minutes";
+const APP_VERSION = "v0.2.17-dynamic-stag-benchmarks";
 const fmt = (value?: number, dp = 1) => value === undefined ? "-" : value.toFixed(dp);
 const scoreClass = (value?: number) => value === undefined ? "" : value >= 80 ? "elite" : value >= 65 ? "good" : value >= 50 ? "okay" : "low";
 const compactMoney = (value?: number) => {
@@ -90,6 +90,8 @@ const STAT_TARGETS: Record<string, { field: string; target: number; label: strin
   shotConversionPct: { field: "conversionPercentage", target: 22, label: "Shot Conversion", suffix: "%", dp: 0 },
   errorsLeadingToGoal90: { field: "errorsLeadingToGoal90", target: 0.25, label: "Errors Leading to Goal per 90" },
 };
+type StagBenchmark = { metricKey: string; roleId: RoleId; slot: SlotId; type: "positive" | "penalty"; source: "dataset" | "fixed"; sample: number; minutes: number; benchmark: number; thresholds: number[] };
+type StagBenchmarkMap = Record<string, StagBenchmark>;
 const isGoalkeeper = (player: ScoredPlayer) => positionCodes(player.position).has("GK");
 const textValue = (value: unknown) => value === undefined || value === null || value === "" ? "-" : String(value);
 const field = (player: ScoredPlayer, ...keys: string[]) => {
@@ -114,6 +116,7 @@ const capsLine = (player: ScoredPlayer) => {
 const statValue = (player: ScoredPlayer, key: string, dp = 2, suffix = "") => typeof player[key] === "number" ? `${(player[key] as number).toFixed(dp)}${suffix}` : "-";
 const clampScore = (value: number) => Math.min(100, Math.max(0, value));
 const minutesConfidence = (minutes = 0) => minutes <= 90 ? 0.1 : minutes <= 180 ? 0.2 : minutes <= 300 ? 0.35 : minutes <= 600 ? 0.55 : minutes <= 900 ? 0.75 : minutes <= 1500 ? 0.9 : 1;
+const benchmarkKey = (slot: SlotId, roleId: RoleId, metricKey: string, type: "positive" | "penalty") => `${slot}:${roleId}:${metricKey}:${type}`;
 const POSITION_CODE_CACHE = new Map<string, Set<string>>();
 function positionCodes(position?: string) {
   const text = String(position ?? "").toUpperCase().replace(/\s+/g, "");
@@ -174,6 +177,7 @@ export default function Home() {
     return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
   }), [players, rankingScores, search, minMinutes, minAge, maxAge, club, nation, positionFilter, foot, suitabilityFilter, maxWage, maxValue, minScore, includeMissingStats, includeMissingHidden, sortKey, sortDirection]);
   const compared = players.filter((player) => compareIds.includes(player.id));
+  const stagBenchmarks = useMemo(() => buildStagBenchmarks(players), [players]);
 
   useEffect(() => {
     if (defaultLoadStarted.current || players.length) return;
@@ -228,7 +232,7 @@ export default function Home() {
     {tab === "compare" && <Comparison players={compared} roleId={roleId} onExport={() => exportCSV("fm-recruitment-comparison.csv", compared)} />}
     {tab === "instructions" && <Instructions />}
     {tab === "settings" && <Settings report={report} onTactic={() => setTab("tactic")} onExport={() => exportCSV("fm-recruitment-full-scored-dataset.csv", players)} />}
-    {selected && <PlayerModal player={selected} slot={slot} roleId={roleId} onClose={() => setSelected(null)} />}
+    {selected && <PlayerModal player={selected} slot={slot} roleId={roleId} benchmarks={stagBenchmarks} onClose={() => setSelected(null)} />}
     <div className="app-version">{APP_VERSION}</div>
   </main>;
 }
@@ -294,7 +298,7 @@ function Instructions() {
     <div className="instruction-section"><h3>Useful notes</h3><p>Not for sale means the club does not want to sell; it is not treated as a missing or zero value. Value ranges use the midpoint for display and scoring. Player faces, club logos and nation logos are loaded from the Cloudflare R2 asset bucket when a UID/path match exists.</p></div>
   </section>;
 }
-function PlayerModal({ player, roleId, slot, onClose }: { player: ScoredPlayer; roleId: RoleId; slot: SlotId; onClose: () => void }) {
+function PlayerModal({ player, roleId, slot, benchmarks, onClose }: { player: ScoredPlayer; roleId: RoleId; slot: SlotId; benchmarks: StagBenchmarkMap; onClose: () => void }) {
   const [profileTab, setProfileTab] = useState<ModalTab>("Attributes");
   const active = scoreForSlot(player, roleId, slot), role = ROLE_CONFIG[roleId];
   const roleWeights = new Set(Object.keys(role.attributeWeights).filter((key) => role.attributeWeights[key] >= 7));
@@ -328,7 +332,7 @@ function PlayerModal({ player, roleId, slot, onClose }: { player: ScoredPlayer; 
         })}</div>;
       })}</div></section>
     </section>
-    <section className="fm-bottom-panels"><div><h3>Strengths</h3><StrengthList items={active.strengths} /></div><div><h3>Score breakdown</h3><Breakdown score={active} /></div><div><h3>Scoring notes</h3><ScoringNotes score={active} /></div></section></> : <ProfileTabContent tab={profileTab} player={player} score={active} slot={slot} />}
+    <section className="fm-bottom-panels"><div><h3>Strengths</h3><StrengthList items={active.strengths} /></div><div><h3>Score breakdown</h3><Breakdown score={active} /></div><div><h3>Scoring notes</h3><ScoringNotes score={active} /></div></section></> : <ProfileTabContent tab={profileTab} player={player} score={active} slot={slot} benchmarks={benchmarks} />}
   </aside></div>;
 }
 function AssetImage({ src, alt, fallback }: { src?: string; alt: string; fallback: string }) {
@@ -336,10 +340,10 @@ function AssetImage({ src, alt, fallback }: { src?: string; alt: string; fallbac
   if (src && !failed) return <img src={src} alt={alt} onError={() => setFailed(true)} />;
   return fallback ? <span>{fallback}</span> : null;
 }
-function ProfileTabContent({ tab, player, score, slot }: { tab: Exclude<ModalTab, "Attributes">; player: ScoredPlayer; score: RoleScore; slot: SlotId }) {
+function ProfileTabContent({ tab, player, score, slot, benchmarks }: { tab: Exclude<ModalTab, "Attributes">; player: ScoredPlayer; score: RoleScore; slot: SlotId; benchmarks: StagBenchmarkMap }) {
   if (tab === "Information") return <section className="fm-tab-panel info-tab"><div className="fm-card-block"><h3>Personal Information</h3><InfoGrid rows={[["Full Name", player.name], ["Personality", field(player, "personality")], ["Media Description", field(player, "mediaDescription")], ["Media Handling", field(player, "mediaHandling")], ["Preferred Foot", field(player, "preferredFoot")], ["Height", height(player.height)], ["Club", player.club], ["Division", player.division]]} /></div><div className="fm-card-block wide"><h3>Nationalities</h3><InfoGrid rows={[["Nationality", player.nationality], ["Second Nationality", player.secondNationality], ["Based", field(player, "basedIn", "based")], ["Position", player.position], ["UID", player.uid], ["Age", player.age]]} /></div></section>;
 
-  if (tab === "FM Stag Stats") return <StagStats player={player} activeSlot={slot} />;
+  if (tab === "FM Stag Stats") return <StagStats player={player} activeSlot={slot} benchmarks={benchmarks} />;
 
   if (tab === "Contract Info") return <section className="fm-tab-panel contract-tab"><div className="fm-card-block"><h3>{player.club ?? "Current Club"}</h3><div className="contract-hero"><strong>{compactWage(player.wageK)} per week</strong><span>{money(player)} transfer value</span></div><InfoGrid rows={[["Contract Type", field(player, "contractType") ?? "Not exported"], ["Expires", field(player, "contractExpires") ?? "Not exported"], ["Started", field(player, "contractStarted") ?? "Not exported"], ["Playing Time", field(player, "playingTime") ?? "Not exported"], ["Wage", compactWage(player.wageK)], ["Value", money(player)]]} /></div><div className="fm-card-block"><h3>Bonuses</h3><InfoGrid rows={[["Appearance Fee", field(player, "appearanceFee") ?? "Not exported"], ["Goal Bonus", field(player, "goalBonus") ?? "Not exported"], ["Unused Substitute Fee", field(player, "unusedSubFee") ?? "Not exported"], ["Loyalty Bonus", field(player, "loyaltyBonus") ?? "Not exported"]]} /></div><div className="fm-card-block"><h3>Clauses</h3><InfoGrid rows={[["Release Clause", field(player, "releaseClause") ?? "Not exported"], ["Yearly Wage Rise", field(player, "yearlyWageRise") ?? "Not exported"], ["Extension Option", field(player, "extensionOption") ?? "Not exported"], ["Sell-on Clause", field(player, "sellOnClause") ?? "Not exported"]]} /></div></section>;
 
@@ -352,9 +356,6 @@ function ProfileTabContent({ tab, player, score, slot }: { tab: Exclude<ModalTab
 function InfoGrid({ rows }: { rows: [string, unknown][] }) {
   return <div className="fm-info-grid">{rows.map(([label, value]) => <div key={label}><span>{label}</span><strong>{textValue(value)}</strong></div>)}</div>;
 }
-function formatStatTarget(metric: { target: number; suffix?: string; dp?: number }) {
-  return `${metric.target.toFixed(metric.dp ?? 2).replace(/\.00$/, "")}${metric.suffix ?? ""}`;
-}
 function formatStatMetric(player: ScoredPlayer, metric: { field: string; suffix?: string; dp?: number }) {
   return statValue(player, metric.field, metric.dp ?? 2, metric.suffix ?? "");
 }
@@ -365,13 +366,56 @@ function formatSignedStat(value: number, metric: { suffix?: string; dp?: number 
   const sign = value > 0 ? "+" : "";
   return `${sign}${formatStatNumber(value, metric)}`;
 }
-function tierThresholds(metric: { target: number }, type: "positive" | "penalty") {
-  const ratios = type === "penalty" ? [2.5, 1.75, 1.2, 1] : [0.45, 0.7, 0.9, 1];
-  return ratios.map((ratio) => metric.target * ratio);
+function percentile(values: number[], ratio: number) {
+  if (!values.length) return undefined;
+  const index = Math.min(values.length - 1, Math.max(0, Math.floor((values.length - 1) * ratio)));
+  return values[index];
 }
-function statTier(value: number | undefined, metric: { target: number }, type: "positive" | "penalty") {
+function fixedBenchmark(slot: SlotId, roleId: RoleId, metricKey: string, type: "positive" | "penalty", metric: { target: number }): StagBenchmark {
+  const ratios = type === "penalty" ? [2.5, 1.75, 1.2, 1] : [0.55, 0.75, 0.9, 1];
+  return { metricKey, roleId, slot, type, source: "fixed", sample: 0, minutes: 0, benchmark: metric.target, thresholds: ratios.map((ratio) => metric.target * ratio) };
+}
+function buildStagBenchmarks(players: ScoredPlayer[]): StagBenchmarkMap {
+  const out: StagBenchmarkMap = {};
+  for (const item of TACTIC_SLOTS) {
+    const role = ROLE_CONFIG[item.roleId];
+    const candidates = players
+      .map((candidate) => ({ player: candidate, minutes: Number(candidate.minutes ?? 0), suitable: Number(scoreForSlot(candidate, item.roleId, item.id).position.score ?? 0) >= 80 }))
+      .filter((candidate) => candidate.suitable);
+    const metricEntries = [...Object.keys(role.positiveStatWeights).map((metricKey) => [metricKey, "positive"] as const), ...Object.keys(role.negativeStatPenalties).map((metricKey) => [metricKey, "penalty"] as const)];
+    for (const [metricKey, type] of metricEntries) {
+      const metric = STAT_TARGETS[metricKey];
+      if (!metric) continue;
+      let picked: { values: number[]; minutes: number } | undefined;
+      for (const minutes of [900, 600, 300, 0]) {
+        const values = candidates
+          .filter((candidate) => candidate.minutes >= minutes)
+          .map((candidate) => candidate.player[metric.field])
+          .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+        if (values.length >= 5 || (minutes === 0 && values.length)) {
+          picked = { values, minutes };
+          break;
+        }
+      }
+      if (!picked) {
+        out[benchmarkKey(item.id, item.roleId, metricKey, type)] = fixedBenchmark(item.id, item.roleId, metricKey, type, metric);
+        continue;
+      }
+      const sorted = picked.values.sort((a, b) => a - b);
+      if (type === "penalty") {
+        const thresholds = [percentile(sorted, 0.75), percentile(sorted, 0.5), percentile(sorted, 0.25), percentile(sorted, 0.1)].map((value) => value ?? metric.target);
+        out[benchmarkKey(item.id, item.roleId, metricKey, type)] = { metricKey, roleId: item.roleId, slot: item.id, type, source: "dataset", sample: sorted.length, minutes: picked.minutes, benchmark: thresholds[3], thresholds };
+      } else {
+        const benchmark = sorted[sorted.length - 1] ?? metric.target;
+        out[benchmarkKey(item.id, item.roleId, metricKey, type)] = { metricKey, roleId: item.roleId, slot: item.id, type, source: "dataset", sample: sorted.length, minutes: picked.minutes, benchmark, thresholds: [0.55, 0.75, 0.9, 1].map((ratio) => benchmark * ratio) };
+      }
+    }
+  }
+  return out;
+}
+function statTierFromThresholds(value: number | undefined, thresholds: number[], type: "positive" | "penalty") {
   if (value === undefined) return { label: "Missing", className: "missing", next: undefined as number | undefined };
-  const [low, medium, high, elite] = tierThresholds(metric, type);
+  const [low, medium, high, elite] = thresholds;
   if (type === "penalty") {
     if (value <= elite) return { label: "Elite", className: "elite", next: undefined };
     if (value <= high) return { label: "High", className: "good", next: elite };
@@ -383,37 +427,43 @@ function statTier(value: number | undefined, metric: { target: number }, type: "
   if (value >= medium) return { label: "Medium", className: "okay", next: high };
   return { label: "Low", className: "low", next: medium };
 }
-function StagStats({ player, activeSlot }: { player: ScoredPlayer; activeSlot: SlotId }) {
+function benchmarkNote(benchmark: StagBenchmark | undefined) {
+  if (!benchmark || benchmark.source === "fixed") return "Fixed fallback benchmark. Load more role-suitable players with minutes for dataset calibration.";
+  return `Dataset benchmark from ${benchmark.sample.toLocaleString()} role-suitable players, ${benchmark.minutes}+ mins.`;
+}
+function StagStats({ player, activeSlot, benchmarks }: { player: ScoredPlayer; activeSlot: SlotId; benchmarks: StagBenchmarkMap }) {
   const [selectedSlot, setSelectedSlot] = useState<SlotId>(activeSlot);
   const tacticSlot = TACTIC_SLOTS.find((item) => item.id === selectedSlot) ?? TACTIC_SLOTS[0];
   const role = ROLE_CONFIG[tacticSlot.roleId], score = scoreForSlot(player, role.id, tacticSlot.id);
   const confidence = minutesConfidence(Number(player.minutes ?? 0));
   const positiveRows = Object.entries(role.positiveStatWeights).map(([key, weight]) => {
     const metric = STAT_TARGETS[key], value = metric && typeof player[metric.field] === "number" ? player[metric.field] as number : undefined;
-    const metricScore = value === undefined || !metric ? undefined : clampScore(value / metric.target * 100);
-    const difference = value === undefined || !metric ? undefined : value - metric.target;
-    const percent = value === undefined || !metric ? undefined : (value / metric.target - 1) * 100;
-    const tier = metric ? statTier(value, metric, "positive") : { label: "Missing", className: "missing", next: undefined };
-    return { key, label: metric?.label ?? key, metric, weight, value, playerValue: metric ? formatStatMetric(player, metric) : "-", target: metric ? formatStatTarget(metric) : "-", score: metricScore, difference, percent, tier, type: "positive" as const };
+    const benchmark = metric ? benchmarks[benchmarkKey(tacticSlot.id, role.id, key, "positive")] ?? fixedBenchmark(tacticSlot.id, role.id, key, "positive", metric) : undefined;
+    const metricScore = value === undefined || !benchmark ? undefined : clampScore(value / benchmark.benchmark * 100);
+    const tier = benchmark ? statTierFromThresholds(value, benchmark.thresholds, "positive") : { label: "Missing", className: "missing", next: undefined };
+    return { key, label: metric?.label ?? key, metric, weight, value, playerValue: metric ? formatStatMetric(player, metric) : "-", benchmark, thresholds: benchmark?.thresholds ?? [], score: metricScore, tier, type: "positive" as const };
   });
   const penaltyRows = Object.entries(role.negativeStatPenalties).map(([key, weight]) => {
     const metric = STAT_TARGETS[key], value = metric && typeof player[metric.field] === "number" ? player[metric.field] as number : undefined;
-    const metricScore = value === undefined || !metric ? undefined : clampScore(value / metric.target * 100);
-    const difference = value === undefined || !metric ? undefined : value - metric.target;
-    const percent = value === undefined || !metric ? undefined : (value / metric.target - 1) * 100;
-    const tier = metric ? statTier(value, metric, "penalty") : { label: "Missing", className: "missing", next: undefined };
-    return { key, label: metric?.label ?? key, metric, weight, value, playerValue: metric ? formatStatMetric(player, metric) : "-", target: metric ? `${formatStatTarget(metric)} max` : "Lower is better", score: metricScore, difference, percent, tier, type: "penalty" as const };
+    const benchmark = metric ? benchmarks[benchmarkKey(tacticSlot.id, role.id, key, "penalty")] ?? fixedBenchmark(tacticSlot.id, role.id, key, "penalty", metric) : undefined;
+    const worst = benchmark?.thresholds[0] ?? metric?.target ?? 1;
+    const metricScore = value === undefined || !benchmark ? undefined : clampScore(100 - (value / Math.max(worst, 0.01) * 100));
+    const tier = benchmark ? statTierFromThresholds(value, benchmark.thresholds, "penalty") : { label: "Missing", className: "missing", next: undefined };
+    return { key, label: metric?.label ?? key, metric, weight, value, playerValue: metric ? formatStatMetric(player, metric) : "-", benchmark, thresholds: benchmark?.thresholds ?? [], score: metricScore, tier, type: "penalty" as const };
   });
   const rows = [...positiveRows, ...penaltyRows];
+  const rowWeights = rows.reduce((sum, row) => row.score === undefined ? sum : sum + row.weight, 0);
+  const dynamicRawStag = rowWeights ? rows.reduce((sum, row) => sum + (row.score === undefined ? 0 : row.score * row.weight), 0) / rowWeights : 50;
+  const dynamicAdjustedStag = clampScore(50 + ((dynamicRawStag - 50) * confidence));
   return <section className="fm-tab-panel stats-tab"><div className="fm-role-tabs tactic-stag-tabs">{TACTIC_SLOTS.map((item) => <button key={item.id} type="button" className={selectedSlot === item.id ? "active" : ""} onClick={() => setSelectedSlot(item.id)} title={roleDisplayName(ROLE_CONFIG[item.roleId])}><strong>{item.id}</strong><span>{roleAbbreviation(ROLE_CONFIG[item.roleId])}</span></button>)}</div>
-    <div className="stag-summary"><ScorePill label="Minutes" value={Number(player.minutes ?? 0)} dp={0} tone={false} /><ScorePill label="Raw STAG" value={score.rawStats} /><ScorePill label="Adjusted STAG" value={score.stats.score ?? 50} /><ScorePill label="Minutes confidence" value={confidence * 100} /><ScorePill label="Inputs" value={(score.stats.available / Math.max(score.stats.expected, 1)) * 100} /></div>
+    <div className="stag-summary"><ScorePill label="Minutes" value={Number(player.minutes ?? 0)} dp={0} tone={false} /><ScorePill label="Raw STAG" value={dynamicRawStag} /><ScorePill label="Adjusted STAG" value={dynamicAdjustedStag} /><ScorePill label="Minutes confidence" value={confidence * 100} /><ScorePill label="Inputs" value={(score.stats.available / Math.max(score.stats.expected, 1)) * 100} /></div>
     <h3>{tacticSlot.id} · {roleDisplayName(role)} performance model</h3>
     <table className="fm-stat-table stag-compare-table"><thead><tr><th>Metric</th><th>Weight</th><th>Player</th><th>Low</th><th>Medium</th><th>High</th><th>Elite</th><th>Tier</th><th>Next step</th><th>Score impact</th></tr></thead><tbody>{rows.map((row) => {
-      const thresholds = row.metric ? tierThresholds(row.metric, row.type) : [], favourableLabel = row.type === "penalty" ? "Lower is better" : "Higher is better";
+      const thresholds = row.thresholds, favourableLabel = row.type === "penalty" ? "Lower is better" : "Higher is better";
       const nextGap = row.metric && row.tier.next !== undefined && row.value !== undefined ? row.type === "penalty" ? row.value - row.tier.next : row.tier.next - row.value : undefined;
       return <tr key={`${row.type}-${row.key}`}><td><strong>{row.label}</strong><small>{favourableLabel}</small></td><td>{(row.weight * 100).toFixed(0)}%</td><td>{row.playerValue}</td>{thresholds.map((threshold, index) => <td key={index}>{row.metric ? formatStatNumber(threshold, row.metric) : "-"}</td>)}<td><span className={`stag-tier ${row.tier.className}`}>{row.tier.label}</span></td><td className={nextGap === undefined ? "baseline-delta missing" : "baseline-delta under"}>{nextGap === undefined || !row.metric ? "-" : formatStatNumber(Math.max(0, nextGap), row.metric)}</td><td className={row.type === "penalty" ? "low" : scoreClass(row.score)}>{row.score === undefined ? "Missing" : `${fmt(row.score, 1)}${row.type === "penalty" ? " penalty" : ""}`}</td></tr>;
     })}</tbody></table>
-    <p className="muted-tab-note">Tiers are derived from the role target used by the scoring model. Positive metrics climb from Low to Elite; negative metrics such as errors are inverted, so lower is better. Adjusted STAG still shrinks the raw score by minutes confidence.</p>
+    <p className="muted-tab-note">Tiers are calibrated from this loaded dataset where possible. Positive Elite is the best role-suitable qualified player for that metric; Low/Medium/High are percentages of that benchmark. Negative metrics use low-end dataset thresholds because lower is better. {benchmarkNote(rows[0]?.benchmark)}</p>
   </section>;
 }
 function ScorePill({ label, value, dp = 1, tone = true }: { label: string; value: number; dp?: number; tone?: boolean }) {
