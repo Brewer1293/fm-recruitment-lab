@@ -1300,24 +1300,30 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
 }
 .fm-role-tabs {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   margin-bottom: 8px;
-  overflow: auto;
+  overflow: hidden;
 }
 .fm-role-tabs span,
 .fm-role-tabs button {
   color: rgba(244,244,244,.58);
-  font-size: 15px;
-  padding: 7px 12px;
+  font-size: 13px;
+  padding: 6px 8px;
 }
 .fm-role-tabs button {
   align-items: center;
   border-radius: 8px;
   display: grid;
   gap: 2px;
-  min-width: 132px;
+  min-width: 0;
   text-align: center;
   text-transform: none;
+}
+.tactic-stag-tabs button {
+  flex: 1 1 0;
+  min-height: 42px;
+  min-width: 54px;
+  padding: 6px 4px;
 }
 .fm-role-tabs button strong {
   color: rgb(255,248,238);
@@ -1325,10 +1331,10 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   line-height: 1;
 }
 .fm-role-tabs button span {
-  font-size: 11px;
-  line-height: 1.15;
+  font-size: 10px;
+  line-height: 1;
   padding: 0;
-  white-space: normal;
+  white-space: nowrap;
 }
 .fm-role-tabs .active {
   background: rgb(43,43,43);
@@ -1491,7 +1497,7 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
 .fm-role-card span { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fm-role-card strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fm-role-card strong, .fm-role-card b { line-height: 1; }
-.fm-role-list { max-height: 178px; overflow: auto; padding-right: 4px; }
+.fm-role-list { overflow: visible; padding-right: 0; }
 .profile-grid.compact { grid-template-columns: repeat(4, minmax(110px, 1fr)); }
 .big-score { align-items: flex-end; display: flex; gap: 9px; }
 .big-score strong { font-size: 48px; }
@@ -1671,6 +1677,9 @@ code { color: var(--orange-2); }
   .pitch { min-width: 520px; }
   .profile-grid.compact, .attribute-groups { grid-template-columns: 1fr; }
   .fm-profile-top, .fm-profile-body, .fm-bottom-panels, .info-tab, .contract-tab, .medical-tab { grid-template-columns: 1fr; }
+  .fm-role-list { max-height: 178px; overflow: auto; padding-right: 4px; }
+  .fm-role-tabs { overflow: auto; }
+  .tactic-stag-tabs button { flex-basis: 58px; }
   .fm-player-card { grid-template-columns: 120px 1fr; min-height: 260px; }
   .profile-logo-stack { gap: 12px; padding: 18px 10px; }
   .flag-tile { height: 54px; width: 86px; }

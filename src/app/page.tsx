@@ -13,7 +13,7 @@ type Tab = "tactic" | "rankings" | "import" | "validation" | "compare" | "instru
 type SortKey = "roleScore" | "recruitmentScore" | "confidenceScore" | "attribute" | "stats" | "hidden" | "position" | "value" | "age" | "minutes" | "averageRating";
 type SuitabilityFilter = "role-position" | "conversion" | "all";
 type PositionFilter = "" | "GK" | "DL" | "DC" | "DR" | "WBL" | "WBR" | "DM" | "ML" | "MC" | "MR" | "AML" | "AMC" | "AMR" | "ST";
-const APP_VERSION = "v0.2.13-responsive-profile";
+const APP_VERSION = "v0.2.14-profile-role-tabs";
 const fmt = (value?: number, dp = 1) => value === undefined ? "-" : value.toFixed(dp);
 const scoreClass = (value?: number) => value === undefined ? "" : value >= 80 ? "elite" : value >= 65 ? "good" : value >= 50 ? "okay" : "low";
 const compactMoney = (value?: number) => {
@@ -49,6 +49,7 @@ const POSITION_OPTIONS: { value: PositionFilter; label: string }[] = [
   { value: "AML", label: "LW / AM (L)" }, { value: "AMC", label: "AM / AM (C)" }, { value: "AMR", label: "RW / AM (R)" }, { value: "ST", label: "ST" },
 ];
 const roleDisplayName = (role: { label: string; duty: string }) => `${role.label} - ${role.duty}`;
+const roleAbbreviation = (role: { shortName: string }) => role.shortName.split("-")[0];
 const ATTRIBUTE_GROUPS = [
   { label: "Technical", keys: [["Cor", "cor"], ["Cro", "cro"], ["Dri", "dri"], ["Fin", "fin"], ["Fir", "fir"], ["Fre", "fre"], ["Hea", "hea"], ["Lon", "lon"], ["L Th", "lth"], ["Mar", "mar"], ["Pas", "pas"], ["Pen", "pen"], ["Tck", "tck"], ["Tec", "tec"]] },
   { label: "Mental", keys: [["Agg", "agg"], ["Ant", "ant"], ["Bra", "bra"], ["Cmp", "cmp"], ["Cnt", "cnt"], ["Vis", "vis"], ["Dec", "dec"], ["Det", "det"], ["Fla", "fla"], ["Ldr", "ldr"], ["OtB", "otb"], ["Pos", "pos"], ["Tea", "tea"], ["Wor", "wor"]] },
@@ -398,7 +399,7 @@ function StagStats({ player, activeSlot }: { player: ScoredPlayer; activeSlot: S
     return { key, label: metric?.label ?? key, metric, weight, value, playerValue: metric ? formatStatMetric(player, metric) : "-", target: metric ? `${formatStatTarget(metric)} max` : "Lower is better", score: metricScore, difference, percent, tier, type: "penalty" as const };
   });
   const rows = [...positiveRows, ...penaltyRows];
-  return <section className="fm-tab-panel stats-tab"><div className="fm-role-tabs tactic-stag-tabs">{TACTIC_SLOTS.map((item) => <button key={item.id} type="button" className={selectedSlot === item.id ? "active" : ""} onClick={() => setSelectedSlot(item.id)}><strong>{item.id}</strong><span>{roleDisplayName(ROLE_CONFIG[item.roleId])}</span></button>)}</div>
+  return <section className="fm-tab-panel stats-tab"><div className="fm-role-tabs tactic-stag-tabs">{TACTIC_SLOTS.map((item) => <button key={item.id} type="button" className={selectedSlot === item.id ? "active" : ""} onClick={() => setSelectedSlot(item.id)} title={roleDisplayName(ROLE_CONFIG[item.roleId])}><strong>{item.id}</strong><span>{roleAbbreviation(ROLE_CONFIG[item.roleId])}</span></button>)}</div>
     <div className="stag-summary"><ScorePill label="Raw STAG" value={score.rawStats} /><ScorePill label="Adjusted STAG" value={score.stats.score ?? 50} /><ScorePill label="Minutes confidence" value={confidence * 100} /><ScorePill label="Inputs" value={(score.stats.available / Math.max(score.stats.expected, 1)) * 100} /></div>
     <h3>{tacticSlot.id} · {roleDisplayName(role)} performance model</h3>
     <table className="fm-stat-table stag-compare-table"><thead><tr><th>Metric</th><th>Weight</th><th>Player</th><th>Low</th><th>Medium</th><th>High</th><th>Elite</th><th>Tier</th><th>Next step</th><th>Score impact</th></tr></thead><tbody>{rows.map((row) => {
