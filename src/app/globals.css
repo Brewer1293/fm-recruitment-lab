@@ -881,6 +881,60 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
 }
 .fm-bottom-panels .breakdown { grid-template-columns: repeat(2, minmax(110px, 1fr)); margin: 0; }
 .fm-bottom-panels strong, .fm-bottom-panels p { font-size: 13px; line-height: 1.35; }
+.empty-note {
+  color: var(--muted);
+  font-style: italic;
+}
+.strength-list,
+.scoring-notes ul {
+  display: grid;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.strength-list li,
+.scoring-notes li {
+  background: rgba(25,25,25,.58);
+  border-left: 3px solid var(--orange);
+  border-radius: 2px;
+  color: rgb(255,248,238);
+  font-size: 13px;
+  line-height: 1.25;
+  padding: 7px 8px;
+}
+.strength-list li:before {
+  color: var(--orange-2);
+  content: "+";
+  font-weight: 800;
+  margin-right: 7px;
+}
+.scoring-notes {
+  display: grid;
+  gap: 10px;
+}
+.scoring-notes > div {
+  background: rgba(25,25,25,.34);
+  border-radius: 2px;
+  padding: 8px;
+}
+.scoring-notes span {
+  color: var(--orange-2);
+  display: block;
+  font-family: "GT FM", "Proxima FM", Arial, sans-serif;
+  font-size: 12px;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+.scoring-notes p {
+  color: rgba(255,248,238,.78);
+  margin: 0 0 6px;
+}
+.scoring-notes p:last-child { margin-bottom: 0; }
+.scoring-notes li {
+  border-left-color: rgba(255,165,40,.65);
+  color: rgba(255,248,238,.84);
+}
 
 .role-bar { align-items: center; display: grid; gap: 8px; grid-template-columns: 56px minmax(0, 1fr) 38px; min-height: 25px; margin: 4px 0; }
 .role-bar span { color: rgb(255,248,238); font-size: 12px; line-height: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

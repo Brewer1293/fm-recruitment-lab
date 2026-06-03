@@ -230,7 +230,7 @@ function PlayerModal({ player, roleId, slot, onClose }: { player: ScoredPlayer; 
         })}</div>;
       })}</div></section>
     </section>
-    <section className="fm-bottom-panels"><div><h3>Strengths</h3><strong>{active.strengths.join(", ") || "No standout exported attributes available."}</strong></div><div><h3>Score breakdown</h3><Breakdown score={active} /></div><div><h3>Scoring notes</h3><p>{active.explanation.join(" ")}</p><p>{[...active.caps, ...active.weaknesses, ...active.warnings].join(", ") || "No major exported-data concerns."}</p></div></section></> : <ProfileTabContent tab={profileTab} player={player} score={active} />}
+    <section className="fm-bottom-panels"><div><h3>Strengths</h3><StrengthList items={active.strengths} /></div><div><h3>Score breakdown</h3><Breakdown score={active} /></div><div><h3>Scoring notes</h3><ScoringNotes score={active} /></div></section></> : <ProfileTabContent tab={profileTab} player={player} score={active} />}
   </aside></div>;
 }
 function AssetImage({ src, alt, fallback }: { src?: string; alt: string; fallback: string }) {
@@ -269,6 +269,14 @@ function statRows(player: ScoredPlayer) {
 }
 function ScorePill({ label, value }: { label: string; value: number }) {
   return <div className="score-pill"><span>{label}</span><strong className={scoreClass(value)}>{fmt(value)}</strong></div>;
+}
+function StrengthList({ items }: { items: string[] }) {
+  if (!items.length) return <p className="empty-note">No standout exported attributes available.</p>;
+  return <ul className="strength-list">{items.map((item) => <li key={item}>{item}</li>)}</ul>;
+}
+function ScoringNotes({ score }: { score: RoleScore }) {
+  const concerns = [...score.caps, ...score.weaknesses, ...score.warnings];
+  return <div className="scoring-notes"><div><span>Role score logic</span>{score.explanation.length ? score.explanation.map((note) => <p key={note}>{note}</p>) : <p>No extra scoring explanation available.</p>}</div><div><span>Checks and warnings</span>{concerns.length ? <ul>{concerns.map((note) => <li key={note}>{note}</li>)}</ul> : <p>No major exported-data concerns.</p>}</div></div>;
 }
 function TopInfoCard({ player }: { player: ScoredPlayer }) {
   const nationUrl = nationLogoUrl(player), caps = capsLine(player);
