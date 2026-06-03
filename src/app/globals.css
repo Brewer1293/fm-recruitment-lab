@@ -150,16 +150,14 @@ nav {
 
 .brand-title {
   align-items: center;
-  background: url("/skin/icons/fm.png") left center / 26px 26px no-repeat;
   color: var(--text);
   display: flex;
-  font-size: 14px;
+  font-size: 17px;
   font-weight: 800;
   gap: 4px;
   height: 32px;
   letter-spacing: 0;
   left: 18px;
-  padding-left: 33px;
   position: absolute;
   top: 22px;
   white-space: nowrap;
