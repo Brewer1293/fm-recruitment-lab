@@ -289,6 +289,24 @@ function formatSignedStat(value: number, metric: { suffix?: string; dp?: number 
   const sign = value > 0 ? "+" : "";
   return `${sign}${formatStatNumber(value, metric)}`;
 }
+function tierThresholds(metric: { target: number }, type: "positive" | "penalty") {
+  const ratios = type === "penalty" ? [2.5, 1.75, 1.2, 1] : [0.45, 0.7, 0.9, 1];
+  return ratios.map((ratio) => metric.target * ratio);
+}
+function statTier(value: number | undefined, metric: { target: number }, type: "positive" | "penalty") {
+  if (value === undefined) return { label: "Missing", className: "missing", next: undefined as number | undefined };
+  const [low, medium, high, elite] = tierThresholds(metric, type);
+  if (type === "penalty") {
+    if (value <= elite) return { label: "Elite", className: "elite", next: undefined };
+    if (value <= high) return { label: "High", className: "good", next: elite };
+    if (value <= medium) return { label: "Medium", className: "okay", next: high };
+    return { label: "Low", className: "low", next: medium };
+  }
+  if (value >= elite) return { label: "Elite", className: "elite", next: undefined };
+  if (value >= high) return { label: "High", className: "good", next: elite };
+  if (value >= medium) return { label: "Medium", className: "okay", next: high };
+  return { label: "Low", className: "low", next: medium };
+}
 function StagStats({ player, activeSlot }: { player: ScoredPlayer; activeSlot: SlotId }) {
   const [selectedSlot, setSelectedSlot] = useState<SlotId>(activeSlot);
   const tacticSlot = TACTIC_SLOTS.find((item) => item.id === selectedSlot) ?? TACTIC_SLOTS[0];
@@ -299,29 +317,27 @@ function StagStats({ player, activeSlot }: { player: ScoredPlayer; activeSlot: S
     const metricScore = value === undefined || !metric ? undefined : clampScore(value / metric.target * 100);
     const difference = value === undefined || !metric ? undefined : value - metric.target;
     const percent = value === undefined || !metric ? undefined : (value / metric.target - 1) * 100;
-    return { key, label: metric?.label ?? key, metric, weight, playerValue: metric ? formatStatMetric(player, metric) : "-", target: metric ? formatStatTarget(metric) : "-", score: metricScore, difference, percent, type: "positive" as const };
+    const tier = metric ? statTier(value, metric, "positive") : { label: "Missing", className: "missing", next: undefined };
+    return { key, label: metric?.label ?? key, metric, weight, value, playerValue: metric ? formatStatMetric(player, metric) : "-", target: metric ? formatStatTarget(metric) : "-", score: metricScore, difference, percent, tier, type: "positive" as const };
   });
   const penaltyRows = Object.entries(role.negativeStatPenalties).map(([key, weight]) => {
     const metric = STAT_TARGETS[key], value = metric && typeof player[metric.field] === "number" ? player[metric.field] as number : undefined;
     const metricScore = value === undefined || !metric ? undefined : clampScore(value / metric.target * 100);
     const difference = value === undefined || !metric ? undefined : value - metric.target;
     const percent = value === undefined || !metric ? undefined : (value / metric.target - 1) * 100;
-    return { key, label: metric?.label ?? key, metric, weight, playerValue: metric ? formatStatMetric(player, metric) : "-", target: metric ? `${formatStatTarget(metric)} max` : "Lower is better", score: metricScore, difference, percent, type: "penalty" as const };
+    const tier = metric ? statTier(value, metric, "penalty") : { label: "Missing", className: "missing", next: undefined };
+    return { key, label: metric?.label ?? key, metric, weight, value, playerValue: metric ? formatStatMetric(player, metric) : "-", target: metric ? `${formatStatTarget(metric)} max` : "Lower is better", score: metricScore, difference, percent, tier, type: "penalty" as const };
   });
   const rows = [...positiveRows, ...penaltyRows];
-  const rowTone = (row: typeof rows[number]) => {
-    if (row.difference === undefined) return "missing";
-    const favourable = row.type === "penalty" ? row.difference <= 0 : row.difference >= 0;
-    return favourable ? "over" : "under";
-  };
   return <section className="fm-tab-panel stats-tab"><div className="fm-role-tabs tactic-stag-tabs">{TACTIC_SLOTS.map((item) => <button key={item.id} type="button" className={selectedSlot === item.id ? "active" : ""} onClick={() => setSelectedSlot(item.id)}><strong>{item.id}</strong><span>{ROLE_CONFIG[item.roleId].shortName}</span></button>)}</div>
     <div className="stag-summary"><ScorePill label="Raw STAG" value={score.rawStats} /><ScorePill label="Adjusted STAG" value={score.stats.score ?? 50} /><ScorePill label="Minutes confidence" value={confidence * 100} /><ScorePill label="Inputs" value={(score.stats.available / Math.max(score.stats.expected, 1)) * 100} /></div>
     <h3>{tacticSlot.id} · {role.shortName} performance model</h3>
-    <table className="fm-stat-table stag-compare-table"><thead><tr><th>Metric</th><th>Weight</th><th>Player</th><th>Elite baseline</th><th>Difference</th><th>% vs baseline</th><th>Score impact</th></tr></thead><tbody>{rows.map((row) => {
-      const tone = rowTone(row), favourableLabel = row.type === "penalty" ? "Under baseline is good" : "Over baseline is good";
-      return <tr key={`${row.type}-${row.key}`}><td><strong>{row.label}</strong><small>{favourableLabel}</small></td><td>{(row.weight * 100).toFixed(0)}%</td><td>{row.playerValue}</td><td>{row.target}</td><td className={`baseline-delta ${tone}`}>{row.difference === undefined || !row.metric ? "Missing" : formatSignedStat(row.difference, row.metric)}</td><td className={`baseline-delta ${tone}`}>{row.percent === undefined ? "-" : `${row.percent > 0 ? "+" : ""}${row.percent.toFixed(0)}%`}</td><td className={row.type === "penalty" ? "low" : scoreClass(row.score)}>{row.score === undefined ? "Missing" : `${fmt(row.score, 1)}${row.type === "penalty" ? " penalty" : ""}`}</td></tr>;
+    <table className="fm-stat-table stag-compare-table"><thead><tr><th>Metric</th><th>Weight</th><th>Player</th><th>Low</th><th>Medium</th><th>High</th><th>Elite</th><th>Tier</th><th>Next step</th><th>Score impact</th></tr></thead><tbody>{rows.map((row) => {
+      const thresholds = row.metric ? tierThresholds(row.metric, row.type) : [], favourableLabel = row.type === "penalty" ? "Lower is better" : "Higher is better";
+      const nextGap = row.metric && row.tier.next !== undefined && row.value !== undefined ? row.type === "penalty" ? row.value - row.tier.next : row.tier.next - row.value : undefined;
+      return <tr key={`${row.type}-${row.key}`}><td><strong>{row.label}</strong><small>{favourableLabel}</small></td><td>{(row.weight * 100).toFixed(0)}%</td><td>{row.playerValue}</td>{thresholds.map((threshold, index) => <td key={index}>{row.metric ? formatStatNumber(threshold, row.metric) : "-"}</td>)}<td><span className={`stag-tier ${row.tier.className}`}>{row.tier.label}</span></td><td className={nextGap === undefined ? "baseline-delta missing" : "baseline-delta under"}>{nextGap === undefined || !row.metric ? "-" : formatStatNumber(Math.max(0, nextGap), row.metric)}</td><td className={row.type === "penalty" ? "low" : scoreClass(row.score)}>{row.score === undefined ? "Missing" : `${fmt(row.score, 1)}${row.type === "penalty" ? " penalty" : ""}`}</td></tr>;
     })}</tbody></table>
-    <p className="muted-tab-note">Baseline is the role target used by the scoring model. Positive metrics want to be above baseline; negative metrics such as errors want to be below it. Adjusted STAG then shrinks the raw score by minutes confidence.</p>
+    <p className="muted-tab-note">Tiers are derived from the role target used by the scoring model. Positive metrics climb from Low to Elite; negative metrics such as errors are inverted, so lower is better. Adjusted STAG still shrinks the raw score by minutes confidence.</p>
   </section>;
 }
 function ScorePill({ label, value }: { label: string; value: number }) {

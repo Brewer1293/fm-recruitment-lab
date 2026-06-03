@@ -819,6 +819,36 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   color: rgba(250,250,250,.34);
   font-weight: 500;
 }
+.stag-tier {
+  border-radius: 2px;
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 800;
+  min-width: 58px;
+  padding: 4px 7px;
+  text-align: center;
+  text-transform: uppercase;
+}
+.stag-tier.elite {
+  background: rgba(0,250,0,.16);
+  color: rgba(0,250,0,.98);
+}
+.stag-tier.good {
+  background: rgba(250,125,0,.18);
+  color: rgba(250,125,0,.98);
+}
+.stag-tier.okay {
+  background: rgba(250,250,250,.10);
+  color: rgba(250,250,250,.78);
+}
+.stag-tier.low {
+  background: rgba(255,86,86,.15);
+  color: rgba(255,86,86,.98);
+}
+.stag-tier.missing {
+  background: rgba(250,250,250,.05);
+  color: rgba(250,250,250,.34);
+}
 .fm-stat-table .low { color: #ff5656; }
 .fm-stat-table .average { color: var(--orange-2); }
 .fm-stat-table .good, .green { color: #75ff68; }
