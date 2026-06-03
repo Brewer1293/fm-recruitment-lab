@@ -19,6 +19,27 @@
   src: url("/skin/fonts/proximanova-bold.ttf") format("truetype");
 }
 
+@font-face {
+  font-family: "GT FM";
+  font-style: normal;
+  font-weight: 400;
+  src: url("/skin/fonts/gt-america-regular.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "GT FM";
+  font-style: normal;
+  font-weight: 800;
+  src: url("/skin/fonts/gt-america-bold.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "Scoreboard FM";
+  font-style: normal;
+  font-weight: 400;
+  src: url("/skin/fonts/scoreboard.ttf") format("truetype");
+}
+
 :root {
   --bg: rgb(25,25,25);
   --surface: rgb(34,34,34);
@@ -35,9 +56,11 @@
   --red: rgb(183,0,5);
   --blue: rgb(104,120,136);
   --paper: url("/skin/boxes/bordered-subtle.png");
+  --attribute-paper: url("/skin/boxes/attributes.png");
   --row-paper: url("/skin/fme/alternate.png");
   --tab-paper: url("/skin/tabs/button.png");
   --tab-active-paper: url("/skin/tabs/button_showing.png");
+  --tab-selected-paper: url("/skin/tabs/button_selected.png");
 }
 
 * { box-sizing: border-box; }
@@ -90,7 +113,7 @@ button, input, select { font: inherit; }
   min-height: 64px;
   padding: 10px 12px;
 }
-.hero h1, h2 { margin: 3px 0 5px; }
+.hero h1, h2 { font-family: "GT FM", "Proxima FM", Arial, sans-serif; margin: 3px 0 5px; }
 .hero h1 {
   font-size: 22px;
   letter-spacing: 0;
@@ -107,7 +130,7 @@ button, input, select { font: inherit; }
 }
 
 .hero-stat { align-self: center; text-align: right; }
-.hero-stat strong { color: var(--orange); display: block; font-size: 28px; line-height: 1; }
+.hero-stat strong { color: var(--orange); display: block; font-family: "Scoreboard FM", "Proxima FM", Arial, sans-serif; font-size: 30px; line-height: 1; }
 .hero-stat span, .panel-head span { color: var(--muted); font-size: 12px; }
 
 nav { display: flex; flex-wrap: wrap; gap: 8px; margin: 15px 0; }
@@ -272,12 +295,18 @@ nav .clear { bottom: 18px; color: var(--red); left: 0; position: absolute; }
   padding: 9px 10px;
   text-transform: uppercase;
 }
+.panel-head strong {
+  color: var(--orange-2);
+  font-family: "GT FM", "Proxima FM", Arial, sans-serif;
+  letter-spacing: 0;
+}
 .panel-head.mini { padding: 12px 0 10px; }
 .table-scroll { max-height: calc(100vh - 315px); overflow: auto; }
 .empty-state { color: var(--muted); padding: 28px; }
 table { border-collapse: collapse; font-size: 12px; width: 100%; }
 th {
   background: rgb(25,25,25);
+  background-image: var(--paper);
   color: rgba(244,244,244,.62);
   cursor: pointer;
   font-size: 11px;
@@ -287,19 +316,19 @@ th {
   text-transform: uppercase;
   top: 0;
 }
-th, td { border-bottom: 1px solid rgba(255, 255, 255, 0.055); padding: 6px 8px; white-space: nowrap; }
+th, td { border-bottom: 1px solid rgba(255, 255, 255, 0.055); padding: 7px 8px; white-space: nowrap; }
 td small { color: var(--muted); display: block; margin-top: 3px; }
 tbody tr:nth-child(odd) { background: rgb(34,34,34); }
-tbody tr:nth-child(even) { background: rgb(43,43,43); }
+tbody tr:nth-child(even) { background: rgb(43,43,43); background-image: var(--row-paper); }
 tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
 .compare { height: 22px; min-width: 24px; padding: 0; }
 .compare.active { border-color: var(--orange); color: var(--orange); }
 
-.elite { color: rgb(0, 250, 0) !important; }
-.good { color: rgb(250, 125, 0) !important; }
+.elite { color: rgba(0, 250, 0, .98) !important; }
+.good { color: rgba(250, 125, 0, .98) !important; }
 .okay { color: rgba(250, 250, 250, .78) !important; }
-.low { color: rgba(250, 250, 250, .42) !important; }
-.missing { color: rgba(250, 250, 250, .28) !important; }
+.low { color: rgba(250, 250, 250, .40) !important; }
+.missing { color: rgba(250, 250, 250, .25) !important; }
 
 .settings details, .validation details { border-top: 1px solid var(--line); padding: 10px 0; }
 .settings summary, .validation summary { cursor: pointer; }
@@ -319,7 +348,7 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   background-image: var(--paper);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-top: 0;
-  border-radius: 8px;
+  border-radius: 3px;
   box-shadow: 0 28px 90px rgba(0, 0, 0, 0.72);
   height: min(92vh, 1010px);
   overflow: auto;
@@ -340,9 +369,10 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
 .fm-profile-top { display: grid; gap: 10px; grid-template-columns: 390px minmax(0, 1fr); margin-bottom: 10px; }
 .fm-player-card {
   align-items: stretch;
-  background: linear-gradient(90deg, rgb(43,43,43), rgb(35,35,35));
+  background: rgb(43,43,43);
+  background-image: var(--paper);
   border: 0;
-  border-radius: 9px;
+  border-radius: 3px;
   display: grid;
   gap: 0;
   grid-template-columns: 152px 1fr;
@@ -428,6 +458,7 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
 .profile-name-strip {
   align-items: center;
   background: linear-gradient(90deg, #142366, #1c347e);
+  background-image: linear-gradient(90deg, rgba(20,35,102,.96), rgba(28,52,126,.96)), var(--tab-active-paper);
   display: grid;
   grid-column: 1 / -1;
   grid-row: 2;
@@ -437,6 +468,7 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
 }
 .profile-name-strip strong {
   color: white;
+  font-family: "GT FM", "Proxima FM", Arial, sans-serif;
   font-size: 20px;
   line-height: 1.1;
   text-transform: uppercase;
@@ -447,9 +479,10 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   margin-top: 2px;
 }
 .fm-info-card {
-  background: linear-gradient(145deg, rgba(42,42,42,.95), rgba(31,31,31,.95));
+  background: rgb(34,34,34);
+  background-image: var(--paper);
   border: 0;
-  border-radius: 11px;
+  border-radius: 3px;
   display: grid;
   gap: 0;
   overflow: hidden;
@@ -467,8 +500,9 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   padding: 0 11px;
 }
 .top-info-row:nth-child(even) {
-  background: linear-gradient(90deg, rgba(255,255,255,.045), rgba(255,255,255,.018));
-  border-radius: 8px;
+  background: rgba(43,43,43,.8);
+  background-image: var(--row-paper);
+  border-radius: 2px;
 }
 .top-info-row.full {
   grid-template-columns: 156px minmax(0, 1fr);
@@ -543,10 +577,11 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   line-height: 1;
 }
 .fm-tabs {
-  background: rgba(34,34,34,.94);
+  background: rgb(34,34,34);
+  background-image: var(--paper);
   border: 0;
   border-bottom: 0;
-  border-radius: 8px 8px 0 0;
+  border-radius: 3px 3px 0 0;
   display: flex;
   gap: 0;
   margin-bottom: 0;
@@ -555,6 +590,8 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
 .fm-tabs button {
   appearance: none;
   background: transparent;
+  background-image: var(--tab-paper);
+  background-repeat: repeat-x;
   border-right: 0;
   border-top: 0;
   border-left: 0;
@@ -563,7 +600,6 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   cursor: pointer;
   flex: 0 0 auto;
   font-size: 15px;
-  background-image: none;
   line-height: 1;
   min-height: 42px;
   padding: 14px 12px 12px 24px;
@@ -571,32 +607,36 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
 }
 .fm-tabs button:before { display: none; }
 .fm-tabs button:after { color: rgba(244,244,244,.16); content: "●"; font-size: 11px; left: 8px; position: absolute; top: 13px; }
-.fm-tabs button.active { background-color: rgba(255,255,255,.025); background-image: none; border-top-color: transparent; color: rgb(255,248,238); }
+.fm-tabs button:hover { background-image: var(--tab-active-paper); color: rgb(255,248,238); }
+.fm-tabs button.active { background-color: rgb(43,43,43); background-image: var(--tab-selected-paper); border-top-color: transparent; color: rgb(255,248,238); }
 .fm-tabs button.active:after { color: var(--orange); }
 .fm-profile-body {
-  background: rgba(34,34,34,.94);
-  background-image: none;
+  background: rgb(34,34,34);
+  background-image: var(--paper);
   border: 0;
-  border-radius: 0 0 8px 8px;
+  border-radius: 0 0 3px 3px;
   display: grid;
   gap: 10px;
   grid-template-columns: 378px 1fr;
   padding: 10px;
 }
 .fm-tab-panel {
-  background: rgba(34,34,34,.94);
-  border-radius: 0 0 8px 8px;
+  background: rgb(34,34,34);
+  background-image: var(--paper);
+  border-radius: 0 0 3px 3px;
   min-height: 420px;
   padding: 16px;
 }
 .fm-card-block {
-  background: rgba(43,43,43,.74);
-  border-radius: 8px;
+  background: rgb(43,43,43);
+  background-image: var(--row-paper);
+  border-radius: 2px;
   padding: 16px;
 }
 .fm-card-block.wide { grid-column: span 2; }
 .fm-card-block h3, .fm-tab-panel h3 {
   color: var(--orange-2);
+  font-family: "GT FM", "Proxima FM", Arial, sans-serif;
   font-size: 15px;
   margin: 0 0 14px;
   text-transform: uppercase;
@@ -620,7 +660,8 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
 }
 .fm-info-grid div:nth-child(odd) {
   background: rgba(54,54,54,.34);
-  border-radius: 7px;
+  background-image: var(--row-paper);
+  border-radius: 2px;
 }
 .fm-info-grid span {
   color: rgba(244,244,244,.58);
@@ -644,9 +685,10 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   padding: 7px 12px;
 }
 .fm-role-tabs .active {
-  background: rgba(255,255,255,.9);
-  border-radius: 8px;
-  color: #203267;
+  background: rgb(43,43,43);
+  background-image: var(--tab-selected-paper);
+  border-radius: 2px;
+  color: var(--orange-2);
 }
 .fm-stat-table, .fm-history-table {
   border-collapse: collapse;
@@ -705,6 +747,7 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
 .fm-position-panel { display: grid; align-content: start; gap: 12px; }
 .fm-position-panel h3, .fm-bottom-panels h3 {
   color: var(--orange-2);
+  font-family: "GT FM", "Proxima FM", Arial, sans-serif;
   font-size: 14px;
   line-height: 1;
   margin: 0;
@@ -715,7 +758,7 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   background: rgb(43,43,43);
   background-image: var(--row-paper);
   border: 0;
-  border-radius: 7px;
+  border-radius: 2px;
   display: grid;
   gap: 8px;
   grid-template-columns: 70px minmax(0, 1fr) 44px;
@@ -742,21 +785,22 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   align-items: start;
   display: grid;
   column-gap: 10px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .attribute-group {
-  background: transparent;
-  background-image: none;
+  background: rgb(34,34,34);
+  background-image: var(--attribute-paper);
   border: 0;
-  border-radius: 0;
-  padding: 0;
+  border-radius: 2px;
+  padding: 6px 0;
 }
 
 .attribute-group h4 {
   background: transparent;
   border-bottom: 0;
   color: var(--orange-2);
+  font-family: "GT FM", "Proxima FM", Arial, sans-serif;
   font-size: 14px;
   line-height: 1;
   margin: 0;
@@ -769,14 +813,14 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   display: grid;
   column-gap: 8px;
   grid-template-columns: minmax(0, 1fr) 28px;
-  min-height: 27px;
+  min-height: 28px;
   padding: 0 10px;
 }
 
 .attribute-row:last-child { border-bottom: 0; }
-.attribute-row:nth-child(even) { background: rgba(54,54,54,.34); background-image: none; border-radius: 7px; }
+.attribute-row:nth-child(even) { background: rgba(54,54,54,.34); background-image: var(--row-paper); border-radius: 2px; }
 .attribute-row span { color: rgb(255,248,238); font-size: 14px; line-height: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.attribute-row strong { font-size: 16px; line-height: 1; text-align: right; }
+.attribute-row strong { font-size: 16px; font-weight: 800; line-height: 1; text-align: right; }
 .attribute-row.important span:after { color: var(--orange); content: " *"; font-weight: 800; }
 .fm-attributes { margin: 0; padding: 0; }
 .fm-attributes .attribute-group { padding: 0; }
@@ -791,7 +835,7 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   background: rgb(34,34,34);
   background-image: var(--paper);
   border: 1px solid rgba(255,255,255,.07);
-  border-radius: 8px;
+  border-radius: 2px;
   min-height: 104px;
   padding: 12px;
 }
