@@ -197,6 +197,23 @@ nav .clear { bottom: 18px; color: var(--red); left: 0; position: absolute; }
 .position span { color: var(--orange-2); font-size: 11px; }
 
 .filters { margin-bottom: 10px; }
+.filters-head {
+  align-items: flex-start;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+}
+.filters-head h2 { margin-top: 2px; }
+.filter-toggle {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+.filters-collapsed .filters {
+  margin-bottom: 8px;
+  padding-bottom: 10px;
+}
+.filters-collapsed .filters-head p { display: none; }
+.filters-collapsed .table-scroll { max-height: calc(100vh - 205px); }
 .filter-grid { display: grid; gap: 7px; grid-template-columns: repeat(6, minmax(120px, 1fr)); margin-top: 12px; }
 .filter-grid label { color: var(--muted); font-size: 10px; font-weight: 700; text-transform: uppercase; }
 .filter-grid input, .filter-grid select {
