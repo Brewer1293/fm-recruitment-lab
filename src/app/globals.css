@@ -1230,10 +1230,9 @@ tbody tr:hover { background: rgba(var(--accent-rgb),.18); cursor: pointer; }
   align-items: center;
   display: flex;
   gap: 6px;
-  position: absolute;
-  right: 50px;
-  top: 8px;
-  z-index: 3;
+  justify-content: flex-start;
+  margin: 0 42px 8px 0;
+  min-height: 32px;
 }
 
 .profile-rank-nav button {
@@ -1251,7 +1250,7 @@ tbody tr:hover { background: rgba(var(--accent-rgb),.18); cursor: pointer; }
 }
 
 .profile-rank-nav button:hover:not(:disabled) {
-  border-color: rgba(255, 166, 38, 0.55);
+  border-color: rgba(var(--accent-rgb), 0.55);
   color: var(--accent);
 }
 

@@ -7,6 +7,7 @@ Update this file before each live push to the standalone FM app.
 ## Unreleased
 
 - Added a Settings theme picker with Classic Orange, Cool Blue and Emerald Green accent themes.
+- Moved player profile ranking navigation so it no longer overlaps the close button.
 
 ## Live History
 
