@@ -2,7 +2,7 @@
 
 Static browser-side FM24 recruitment app for scoring large Football Manager HTML exports against the selected tactic roles.
 
-Live app: `https://home.brewerlabs.uk/fm-recruitment/`
+Live app: `https://fmapp.brewerlabs.uk/`
 
 ## What It Does
 
@@ -25,8 +25,8 @@ The default database and graphic assets are downloaded from Cloudflare R2/CDN. U
 From the repository root:
 
 ```bash
-npm --prefix fm-recruitment install
-npm --prefix fm-recruitment run dev -- --hostname 127.0.0.1 --port 4175
+npm install
+npm run dev -- --hostname 127.0.0.1 --port 4175
 ```
 
 Open `http://127.0.0.1:4175/`.
@@ -36,16 +36,22 @@ Open `http://127.0.0.1:4175/`.
 Standalone FM app build:
 
 ```bash
-NEXT_PUBLIC_BASE_PATH=/fm-recruitment npm --prefix fm-recruitment run build
-```
-
-Full site build from the repository root:
-
-```bash
 npm run build
 ```
 
-The full build exports the FM app and copies it into the root site at `public/fm-recruitment`, then builds the Vite project into `dist`.
+The app is a static Next.js export. Cloudflare Pages should publish the generated `out` directory.
+
+If you ever need to serve the app under a subpath again, set `NEXT_PUBLIC_BASE_PATH`, but the production `fmapp.brewerlabs.uk` build should not use a base path.
+
+## Repository Split
+
+This repository was split out from the old combined `brewerlabs-home` repository using `git subtree split --prefix=fm-recruitment`, so the FM app keeps its own useful history while becoming independently deployable.
+
+The home page repository should only link to this app:
+
+```text
+https://fmapp.brewerlabs.uk/
+```
 
 ## Football Manager Export Workflow
 
@@ -137,11 +143,11 @@ Small samples are pulled back toward 50 so low-minute players do not jump above 
 
 ## Deployment
 
-Deploy through the root repository, not this nested app directly:
+Deploy this repository directly:
 
 ```bash
 npm run build
 git push origin main
 ```
 
-Cloudflare Pages builds `main` and publishes `dist` to `home.brewerlabs.uk`.
+Cloudflare Pages publishes the app to `fmapp.brewerlabs.uk`.
