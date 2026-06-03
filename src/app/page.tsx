@@ -25,6 +25,7 @@ const ATTRIBUTE_GROUPS = [
   { label: "Physical", keys: [["Acc", "acc"], ["Pac", "pac"], ["Sta", "sta"], ["Str", "str"], ["Agi", "agi"], ["Bal", "bal"], ["Jum", "jum"], ["Nat", "nat"]] },
   { label: "Goalkeeping", keys: [["Ref", "ref"], ["1v1", "oneVOne"], ["Cmd", "cmd"], ["Kic", "kic"], ["Thr", "thr"], ["Han", "han"], ["Aer", "aer"]] },
 ] as const;
+const modalTabs = ["Attributes", "Information", "FM Stag Stats", "Contract Info", "Transfer Status", "Medical Report", "History"];
 const attrTone = (value?: number) => value === undefined ? "missing" : value >= 16 ? "elite" : value >= 13 ? "good" : value >= 10 ? "okay" : "low";
 const POSITION_CODE_CACHE = new Map<string, Set<string>>();
 function positionCodes(position?: string) {
@@ -145,19 +146,28 @@ function Settings({ onExport }: { onExport: () => void }) {
 function PlayerModal({ player, roleId, slot, onClose }: { player: ScoredPlayer; roleId: RoleId; slot: SlotId; onClose: () => void }) {
   const active = scoreForSlot(player, roleId, slot), role = ROLE_CONFIG[roleId];
   const roleWeights = new Set(Object.keys(role.attributeWeights).filter((key) => role.attributeWeights[key] >= 7));
-  return <div className="backdrop" onClick={onClose}><aside className="modal profile-modal" onClick={(e) => e.stopPropagation()}><button className="modal-close" onClick={onClose}>×</button>
-    <section className="profile-header"><div><span className="eyebrow">Recruitment profile</span><h2>{player.name}</h2><p>{player.club} · {player.nationality} · {player.position}</p></div><div className="role-score-badge"><strong className={scoreClass(active.roleScore)}>{fmt(active.roleScore)}</strong><span>Role Score</span></div></section>
-    <div className="profile-grid compact"><div><span>Age</span><strong>{player.age ?? "-"}</strong></div><div><span>FM Value</span><strong>{money(player)}</strong></div><div><span>Wage</span><strong>£{fmt(player.wageK)}k/w</strong></div><div><span>Feet</span><strong>{player.preferredFoot ?? `${player.leftFoot ?? "-"} / ${player.rightFoot ?? "-"}`}</strong></div></div>
-    <h3>{slot} · {role.shortName} suitability</h3><Breakdown score={active} />
-    <section className="attribute-panel"><div className="panel-head mini"><strong>Attributes</strong><span>Role-defining attributes are marked</span></div><div className="attribute-groups">{ATTRIBUTE_GROUPS.map((group) => {
-      const visible = group.keys.filter(([, key]) => player[key] !== undefined);
-      if (!visible.length) return null;
-      return <div className="attribute-group" key={group.label}><h4>{group.label}</h4>{visible.map(([label, key]) => {
-        const value = player[key] as number | undefined, important = roleWeights.has(label);
-        return <div className={important ? "attribute-row important" : "attribute-row"} key={label}><span>{label}</span><strong className={attrTone(value)}>{value ?? "-"}</strong></div>;
-      })}</div>;
-    })}</div></section>
-    <h3>All roles</h3>{Object.values(ROLE_CONFIG).map((candidate) => <div className="role-bar" key={candidate.id}><span>{candidate.shortName}</span><i><b className={scoreClass(player.scores[candidate.id].roleScore)} style={{ width: `${player.scores[candidate.id].roleScore}%` }} /></i><strong className={scoreClass(player.scores[candidate.id].roleScore)}>{fmt(player.scores[candidate.id].roleScore)}</strong></div>)}
-    <h3>Why this player scores well</h3><p>{active.strengths.join(", ") || "No standout exported attributes available."}</p><h3>Concerns and caps</h3><p>{[...active.caps, ...active.weaknesses, ...active.warnings].join(", ") || "No major exported-data concerns."}</p><h3>Scoring explanation</h3><p>{active.explanation.join(" ")}</p></aside></div>;
+  const bestRole = Object.values(ROLE_CONFIG).map((candidate) => ({ role: candidate, score: player.scores[candidate.id].roleScore })).sort((a, b) => b.score - a.score)[0];
+  return <div className="backdrop" onClick={onClose}><aside className="modal fm-profile-modal" onClick={(e) => e.stopPropagation()}><button className="modal-close" onClick={onClose}>×</button>
+    <section className="fm-profile-top">
+      <div className="fm-player-card"><div className="fm-flag">{String(player.nationality ?? "?").slice(0, 3).toUpperCase()}</div><div className="fm-portrait"><span>{player.name.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase()}</span></div><div className="fm-shirt">{player.club ? player.club.slice(0, 3).toUpperCase() : "CLB"}</div><strong>{player.name}</strong></div>
+      <div className="fm-info-card"><ProfileLine label="Nationality" value={player.nationality ?? "-"} /><ProfileLine label="Position" value={player.position ?? "-"} /><ProfileLine label="Age" value={player.age ?? "-"} /><ProfileLine label="Wage" value={`£${fmt(player.wageK)}k/w`} splitLabel="Value" splitValue={money(player)} /><ProfileLine label="Role" value={`${slot} · ${role.shortName}`} splitLabel="Best role" splitValue={`${bestRole.role.shortName} ${fmt(bestRole.score)}`} /><ProfileLine label="Role Score" value={fmt(active.roleScore)} splitLabel="Confidence" splitValue={fmt(active.confidenceScore)} /></div>
+    </section>
+    <div className="fm-tabs">{modalTabs.map((label, index) => <span className={index === 0 ? "active" : ""} key={label}>{label}</span>)}</div>
+    <section className="fm-profile-body">
+      <div className="fm-position-panel"><h3>Positions</h3><div className="mini-pitch"><span className="zone z1" /><span className="zone z2" /><span className="zone z3" /><span className="zone z4" /></div><h3>Role And Duty</h3><div className="fm-role-card"><strong>{role.shortName}</strong><span>{role.label}</span><b className={scoreClass(active.roleScore)}>{fmt(active.roleScore)}</b></div><div className="fm-role-list">{Object.values(ROLE_CONFIG).map((candidate) => <div className="role-bar" key={candidate.id}><span>{candidate.shortName}</span><i><b className={scoreClass(player.scores[candidate.id].roleScore)} style={{ width: `${player.scores[candidate.id].roleScore}%` }} /></i><strong className={scoreClass(player.scores[candidate.id].roleScore)}>{fmt(player.scores[candidate.id].roleScore)}</strong></div>)}</div></div>
+      <section className="attribute-panel fm-attributes"><div className="attribute-groups">{ATTRIBUTE_GROUPS.slice(0, 3).map((group) => {
+        const visible = group.keys.filter(([, key]) => player[key] !== undefined);
+        if (!visible.length) return null;
+        return <div className="attribute-group" key={group.label}><h4>{group.label}</h4>{visible.map(([label, key]) => {
+          const value = player[key] as number | undefined, important = roleWeights.has(label);
+          return <div className={important ? "attribute-row important" : "attribute-row"} key={label}><span>{label}</span><strong className={attrTone(value)}>{value ?? "-"}</strong></div>;
+        })}</div>;
+      })}</div></section>
+    </section>
+    <section className="fm-bottom-panels"><div><h3>Dynamics</h3><strong>{active.strengths.join(", ") || "No standout exported attributes available."}</strong></div><div><h3>Fitness</h3><Breakdown score={active} /></div><div><h3>Scoring Explanation</h3><p>{active.explanation.join(" ")}</p><p>{[...active.caps, ...active.weaknesses, ...active.warnings].join(", ") || "No major exported-data concerns."}</p></div></section>
+  </aside></div>;
+}
+function ProfileLine({ label, value, splitLabel, splitValue }: { label: string; value: string | number; splitLabel?: string; splitValue?: string | number }) {
+  return <div className="profile-line"><span>{label}</span><strong>{value}</strong>{splitLabel && <><span>{splitLabel}</span><strong>{splitValue}</strong></>}</div>;
 }
 function Breakdown({ score }: { score: RoleScore }) { const parts: [string, RoleScore[keyof Pick<RoleScore, "attribute" | "stats" | "hidden" | "position" | "value">]][] = [["Attributes", score.attribute], ["Adjusted Stats", score.stats], ["Hidden/Profile", score.hidden], ["Position/Foot", score.position], ["Value", score.value]]; return <div className="breakdown">{parts.map(([label, item]) => <div key={label}><span>{label}</span><strong>{fmt(item.score)}</strong><small>{item.available}/{item.expected} inputs</small></div>)}</div>; }
