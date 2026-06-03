@@ -235,21 +235,155 @@ nav button.active {
 
 nav .clear { bottom: 18px; color: var(--red); left: 0; position: absolute; }
 .panel { overflow: hidden; padding: 10px; }
-.import-panel { max-width: 920px; }
+.import-panel { max-width: 980px; }
+
+.import-hero {
+  align-items: end;
+  background: rgb(43,43,43);
+  background-image: var(--paper);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 8px;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin-bottom: 10px;
+  padding: 16px 18px;
+}
+
+.import-hero h2 { font-size: 25px; line-height: 1; margin: 4px 0 7px; }
+.import-hero p { margin: 0; max-width: 650px; }
+.import-loaded { min-width: 142px; text-align: right; }
+.import-loaded strong {
+  color: var(--orange);
+  display: block;
+  font-family: "Scoreboard FM", monospace;
+  font-size: 34px;
+  font-weight: 400;
+  line-height: .9;
+}
+.import-loaded span { color: var(--muted); font-size: 12px; }
+
+.import-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(300px, 1.15fr) minmax(280px, .85fr);
+}
 
 .dropzone {
-  border: 1px dashed rgba(240, 161, 51, 0.65);
-  border-radius: 2px;
+  align-content: center;
+  background:
+    linear-gradient(135deg, rgba(255,165,40,.13), transparent 38%),
+    rgb(34,34,34);
+  background-image: linear-gradient(135deg, rgba(255,165,40,.13), transparent 38%), var(--paper);
+  border: 1px dashed rgba(240, 161, 51, 0.72);
+  border-radius: 8px;
+  cursor: pointer;
   display: grid;
   gap: 8px;
-  margin-top: 18px;
-  padding: 28px;
+  min-height: 222px;
+  padding: 24px;
+  position: relative;
+}
+
+.dropzone:before {
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 6px;
+  content: "";
+  inset: 8px;
+  pointer-events: none;
+  position: absolute;
+}
+
+.dropzone:hover {
+  background-color: rgb(43,43,43);
+  border-color: var(--orange);
+}
+
+.dropzone.busy { cursor: wait; opacity: .84; }
+.dropzone .drop-kicker {
+  color: var(--orange);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.dropzone strong { font-size: 24px; line-height: 1; }
+.dropzone small { color: var(--muted); font-size: 13px; max-width: 410px; }
+.dropzone input {
+  inset: 0;
+  cursor: pointer;
+  opacity: 0;
+  position: absolute;
 }
 
 .dropzone span, .dropzone input { color: var(--muted); }
+
+.default-db-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.import-action {
+  align-content: center;
+  background: rgb(43,43,43);
+  background-image: var(--row-paper);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  min-height: 68px;
+  padding: 10px 12px;
+  text-align: left;
+  text-transform: none;
+  width: 100%;
+}
+
+.import-action span {
+  color: var(--orange);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.import-action strong { color: var(--text); font-size: 15px; line-height: 1; }
+.import-action small { color: var(--muted); font-size: 12px; line-height: 1.25; }
+.import-action.primary { background-image: var(--tab-active-paper); border-color: rgba(255,165,40,.42); }
+.import-action:disabled, .dropzone input:disabled { cursor: wait; opacity: .58; }
+
+.import-foot {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 10px;
+}
+
+.import-foot div {
+  background: rgb(34,34,34);
+  background-image: var(--row-paper);
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 7px;
+  display: grid;
+  gap: 3px;
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: 9px 10px;
+}
+
+.import-foot span {
+  color: var(--orange);
+  font-family: "Scoreboard FM", monospace;
+  font-size: 18px;
+  grid-row: span 2;
+  line-height: 1;
+  padding-right: 4px;
+}
+
+.import-foot strong { font-size: 13px; line-height: 1; }
+.import-foot small { color: var(--muted); font-size: 12px; line-height: 1.2; }
 .progress { background: rgb(25,25,25); border-radius: 2px; height: 24px; margin-top: 16px; overflow: hidden; position: relative; }
 .progress div { background: linear-gradient(90deg, var(--orange), var(--orange-2)); height: 100%; transition: width 0.15s; }
 .progress span { font-size: 12px; inset: 5px 12px; position: absolute; }
+.import-progress { border: 1px solid rgba(255,255,255,.08); border-radius: 7px; }
 .notice { background: var(--surface); border: 1px solid var(--red); border-radius: 2px; color: var(--red); margin-bottom: 8px; padding: 10px; }
 
 .report-grid, .profile-grid, .breakdown {
@@ -1175,6 +1309,8 @@ code { color: var(--orange-2); }
   nav .clear { position: static; }
   .tactic-wrap { grid-template-columns: 1fr; overflow: auto; }
   .filter-grid { grid-template-columns: repeat(2, 1fr); }
+  .import-hero, .import-grid, .import-foot { grid-template-columns: 1fr; }
+  .import-loaded { text-align: left; }
   .instruction-grid, .instruction-split { grid-template-columns: 1fr; }
   .pitch { min-width: 520px; }
   .profile-grid.compact, .attribute-groups { grid-template-columns: 1fr; }
