@@ -10,9 +10,15 @@ import type { RoleId, RoleScore, ScoredPlayer, SlotId, ValidationReport } from "
 type Tab = "tactic" | "rankings" | "import" | "validation" | "compare" | "settings";
 type SortKey = "roleScore" | "recruitmentScore" | "confidenceScore" | "attribute" | "stats" | "hidden" | "position" | "value" | "age" | "minutes" | "averageRating";
 type SuitabilityFilter = "role-position" | "conversion" | "all";
+type PositionFilter = "" | "GK" | "DL" | "DC" | "DR" | "WBL" | "WBR" | "DM" | "ML" | "MC" | "MR" | "AML" | "AMC" | "AMR" | "ST";
 const fmt = (value?: number, dp = 1) => value === undefined ? "-" : value.toFixed(dp);
 const scoreClass = (value?: number) => value === undefined ? "" : value >= 80 ? "elite" : value >= 65 ? "good" : value >= 50 ? "okay" : "low";
 const money = (player: ScoredPlayer) => player.transferValueStatus === "not_for_sale" ? "Not for sale" : player.valueM === undefined ? "-" : `£${fmt(player.valueM)}m`;
+const POSITION_OPTIONS: { value: PositionFilter; label: string }[] = [
+  { value: "", label: "All positions" }, { value: "GK", label: "GK" }, { value: "DL", label: "LB / D (L)" }, { value: "DC", label: "CB / D (C)" }, { value: "DR", label: "RB / D (R)" },
+  { value: "WBL", label: "LWB / WB (L)" }, { value: "WBR", label: "RWB / WB (R)" }, { value: "DM", label: "DM" }, { value: "ML", label: "LM / M (L)" }, { value: "MC", label: "CM / M (C)" }, { value: "MR", label: "RM / M (R)" },
+  { value: "AML", label: "LW / AM (L)" }, { value: "AMC", label: "AM / AM (C)" }, { value: "AMR", label: "RW / AM (R)" }, { value: "ST", label: "ST" },
+];
 const ATTRIBUTE_GROUPS = [
   { label: "Technical", keys: [["Fir", "fir"], ["Fin", "fin"], ["Pas", "pas"], ["Tec", "tec"], ["Dri", "dri"], ["Cro", "cro"], ["Hea", "hea"], ["Tck", "tck"], ["Lon", "lon"]] },
   { label: "Mental", keys: [["OtB", "otb"], ["Tea", "tea"], ["Vis", "vis"], ["Dec", "dec"], ["Ant", "ant"], ["Cmp", "cmp"], ["Cnt", "cnt"], ["Pos", "pos"], ["Fla", "fla"], ["Bra", "bra"], ["Det", "det"], ["Wor", "wor"]] },
@@ -20,6 +26,31 @@ const ATTRIBUTE_GROUPS = [
   { label: "Goalkeeping", keys: [["Ref", "ref"], ["1v1", "oneVOne"], ["Cmd", "cmd"], ["Kic", "kic"], ["Thr", "thr"], ["Han", "han"], ["Aer", "aer"]] },
 ] as const;
 const attrTone = (value?: number) => value === undefined ? "missing" : value >= 16 ? "elite" : value >= 13 ? "good" : value >= 10 ? "okay" : "low";
+const POSITION_CODE_CACHE = new Map<string, Set<string>>();
+function positionCodes(position?: string) {
+  const text = String(position ?? "").toUpperCase().replace(/\s+/g, "");
+  const cached = POSITION_CODE_CACHE.get(text);
+  if (cached) return cached;
+  const out = new Set<string>();
+  if (text.includes("GK")) out.add("GK");
+  if (/(^|,|\/)DM($|,|\/)/.test(text)) out.add("DM");
+  if (/(^|,|\/)ST(?:\([RLC]+\))?($|,|\/)/.test(text)) out.add("ST");
+  for (const match of text.matchAll(/([A-Z/]+)\(([RLC]+)\)/g)) {
+    const bases = match[1].split("/");
+    const sides = match[2].split("");
+    for (const base of bases) for (const side of sides) {
+      if (base === "D") out.add(side === "L" ? "DL" : side === "R" ? "DR" : "DC");
+      if (base === "WB") out.add(side === "L" ? "WBL" : side === "R" ? "WBR" : "DC");
+      if (base === "M") out.add(side === "L" ? "ML" : side === "R" ? "MR" : "MC");
+      if (base === "AM") out.add(side === "L" ? "AML" : side === "R" ? "AMR" : "AMC");
+      if (base === "ST") out.add("ST");
+    }
+  }
+  ["DL", "DR", "DC", "WBL", "WBR", "MC", "ML", "MR", "AMC", "AML", "AMR"].forEach((code) => { if (text.includes(code)) out.add(code); });
+  POSITION_CODE_CACHE.set(text, out);
+  return out;
+}
+const matchesPosition = (player: ScoredPlayer, filter: PositionFilter) => !filter || positionCodes(player.position).has(filter);
 
 export default function Home() {
   const [tab, setTab] = useState<Tab>("import"), [players, setPlayers] = useState<ScoredPlayer[]>([]);
@@ -28,8 +59,8 @@ export default function Home() {
   const [roleId, setRoleId] = useState<RoleId>("af-at"), [slot, setSlot] = useState<SlotId>("ST");
   const [selected, setSelected] = useState<ScoredPlayer | null>(null), [compareIds, setCompareIds] = useState<string[]>([]);
   const [search, setSearch] = useState(""), [minMinutes, setMinMinutes] = useState(0), [maxAge, setMaxAge] = useState(50);
-  const [minAge, setMinAge] = useState(0), [club, setClub] = useState(""), [nation, setNation] = useState(""), [positionFilter, setPositionFilter] = useState(""), [foot, setFoot] = useState("");
-  const [suitabilityFilter, setSuitabilityFilter] = useState<SuitabilityFilter>("role-position");
+  const [minAge, setMinAge] = useState(0), [club, setClub] = useState(""), [nation, setNation] = useState(""), [positionFilter, setPositionFilter] = useState<PositionFilter>(""), [foot, setFoot] = useState("");
+  const [suitabilityFilter, setSuitabilityFilter] = useState<SuitabilityFilter>("all");
   const [maxWage, setMaxWage] = useState(1000), [maxValue, setMaxValue] = useState(500), [minScore, setMinScore] = useState(0);
   const [includeMissingStats, setIncludeMissingStats] = useState(true), [includeMissingHidden, setIncludeMissingHidden] = useState(true);
   const [sortKey, setSortKey] = useState<SortKey>("roleScore"), [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
@@ -42,7 +73,7 @@ export default function Home() {
     return `${player.name} ${player.club ?? ""}`.toLowerCase().includes(search.toLowerCase()) &&
       Number(player.minutes ?? 0) >= minMinutes && Number(player.age ?? 0) >= minAge && Number(player.age ?? 0) <= maxAge &&
       String(player.club ?? "").toLowerCase().includes(club.toLowerCase()) && String(player.nationality ?? "").toLowerCase().includes(nation.toLowerCase()) &&
-      String(player.position ?? "").toLowerCase().includes(positionFilter.toLowerCase()) && `${player.preferredFoot ?? ""} ${player.leftFoot ?? ""} ${player.rightFoot ?? ""}`.toLowerCase().includes(foot.toLowerCase()) &&
+      matchesPosition(player, positionFilter) && `${player.preferredFoot ?? ""} ${player.leftFoot ?? ""} ${player.rightFoot ?? ""}`.toLowerCase().includes(foot.toLowerCase()) &&
       Number(player.wageK ?? 0) <= maxWage && valuePass && positionPass && score.roleScore >= minScore &&
       (includeMissingStats || score.stats.available > 0) && (includeMissingHidden || score.hidden.available > 0);
   }).sort((a, b) => {
@@ -79,8 +110,8 @@ export default function Home() {
 
     {tab === "validation" && <Validation report={report} onTactic={() => setTab("tactic")} />}
     {tab === "tactic" && <Tactic onSelect={selectSlot} />}
-    {tab === "rankings" && <section className="rank-layout"><section className="panel filters"><div><span className="eyebrow">{slot}</span><h2>{ROLE_CONFIG[roleId].shortName} · {ROLE_CONFIG[roleId].label}</h2><p>Default ranking is Best Role Fit. Use Recruitment Score when you want cost and age included.</p></div>
-      <div className="filter-grid"><label>Search<input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Player or club" /></label><label>Club<input value={club} onChange={(e) => setClub(e.target.value)} placeholder="Any club" /></label><label>Nation<input value={nation} onChange={(e) => setNation(e.target.value)} placeholder="Any nation" /></label><label>Position text<input value={positionFilter} onChange={(e) => setPositionFilter(e.target.value)} placeholder="e.g. ST or DM" /></label><label>Role suitability<select value={suitabilityFilter} onChange={(e) => setSuitabilityFilter(e.target.value as SuitabilityFilter)}><option value="role-position">Role position only</option><option value="conversion">Include conversions</option><option value="all">All players</option></select></label><label>Footedness<input value={foot} onChange={(e) => setFoot(e.target.value)} placeholder="left / right / either" /></label><label>Minimum minutes<input type="number" value={minMinutes} onChange={(e) => setMinMinutes(Number(e.target.value))} /></label><label>Minimum age<input type="number" value={minAge} onChange={(e) => setMinAge(Number(e.target.value))} /></label><label>Maximum age<input type="number" value={maxAge} onChange={(e) => setMaxAge(Number(e.target.value))} /></label><label>Maximum wage £k/w<input type="number" value={maxWage} onChange={(e) => setMaxWage(Number(e.target.value))} /></label><label>Maximum value £m<input type="number" value={maxValue} onChange={(e) => setMaxValue(Number(e.target.value))} /></label><label>Minimum Role Score<input type="number" value={minScore} onChange={(e) => setMinScore(Number(e.target.value))} /></label></div>
+    {tab === "rankings" && <section className="rank-layout"><section className="panel filters"><div><span className="eyebrow">{slot}</span><h2>{ROLE_CONFIG[roleId].shortName} · {ROLE_CONFIG[roleId].label}</h2><p>Default ranking is Best Role Fit. Use Role suitability to hide players who cannot play the selected position.</p></div>
+      <div className="filter-grid"><label>Search<input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Player or club" /></label><label>Club<input value={club} onChange={(e) => setClub(e.target.value)} placeholder="Any club" /></label><label>Nation<input value={nation} onChange={(e) => setNation(e.target.value)} placeholder="Any nation" /></label><label>Position<select value={positionFilter} onChange={(e) => setPositionFilter(e.target.value as PositionFilter)}>{POSITION_OPTIONS.map((option) => <option key={option.value || "all"} value={option.value}>{option.label}</option>)}</select></label><label>Role suitability<select value={suitabilityFilter} onChange={(e) => setSuitabilityFilter(e.target.value as SuitabilityFilter)}><option value="role-position">Role position only</option><option value="conversion">Include conversions</option><option value="all">All players</option></select></label><label>Footedness<input value={foot} onChange={(e) => setFoot(e.target.value)} placeholder="left / right / either" /></label><label>Minimum minutes<input type="number" value={minMinutes} onChange={(e) => setMinMinutes(Number(e.target.value))} /></label><label>Minimum age<input type="number" value={minAge} onChange={(e) => setMinAge(Number(e.target.value))} /></label><label>Maximum age<input type="number" value={maxAge} onChange={(e) => setMaxAge(Number(e.target.value))} /></label><label>Maximum wage £k/w<input type="number" value={maxWage} onChange={(e) => setMaxWage(Number(e.target.value))} /></label><label>Maximum value £m<input type="number" value={maxValue} onChange={(e) => setMaxValue(Number(e.target.value))} /></label><label>Minimum Role Score<input type="number" value={minScore} onChange={(e) => setMinScore(Number(e.target.value))} /></label></div>
       <div className="toggles"><label><input type="checkbox" checked={includeMissingStats} onChange={(e) => setIncludeMissingStats(e.target.checked)} /> Include missing stats</label><label><input type="checkbox" checked={includeMissingHidden} onChange={(e) => setIncludeMissingHidden(e.target.checked)} /> Include missing hidden data</label>
       <button onClick={() => exportCSV(`${slot}-${roleId}-rankings.csv`, rankings, rankingScores)}>Export CSV</button><button onClick={() => exportHTML(`${slot}-${roleId}-rankings.html`, rankings, rankingScores)}>Export HTML</button></div></section>
       <RankTable players={rankings.slice(0, 500)} total={rankings.length} scores={rankingScores} compareIds={compareIds} sort={sort} onOpen={setSelected} onCompare={toggleCompare} /></section>}
