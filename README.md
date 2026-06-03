@@ -14,6 +14,7 @@ Live app: `https://fmapp.brewerlabs.uk/`
 - Loads player faces, club logos and nation logos from the `assets.brewerlabs.uk` asset bucket.
 - Provides FM-style player profiles, STAG stat baselines, comparison tools, import validation and export options.
 - Includes a Settings theme picker for orange, blue and emerald accent styles.
+- Shows the loaded-dataset players used as STAG baselines for each tactic role and metric.
 
 ## Privacy Model
 

@@ -1096,6 +1096,48 @@ tbody tr:hover { background: rgba(var(--accent-rgb),.18); cursor: pointer; }
 .theme-option strong { font-size: 13px; line-height: 1.1; }
 .theme-option small { color: var(--muted); font-size: 11px; line-height: 1.3; }
 
+.baseline-settings {
+  grid-template-columns: minmax(260px, .32fr) minmax(0, 1fr);
+}
+
+.baseline-role-list {
+  display: grid;
+  gap: 8px;
+}
+
+.baseline-role {
+  background: rgba(20,20,20,.28);
+  border: 1px solid rgba(255,255,255,.075);
+  border-radius: 7px;
+  padding: 0;
+}
+
+.baseline-role summary {
+  padding: 10px 11px;
+}
+
+.baseline-role summary strong {
+  color: var(--orange-2);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.baseline-table th,
+.baseline-table td {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.baseline-table td:first-child,
+.baseline-table th:first-child {
+  min-width: 210px;
+}
+
+.baseline-table td:nth-child(2),
+.baseline-table th:nth-child(2) {
+  min-width: 190px;
+}
+
 .instructions-panel {
   display: grid;
   gap: 12px;
