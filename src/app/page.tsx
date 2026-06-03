@@ -27,6 +27,12 @@ const ATTRIBUTE_GROUPS = [
 ] as const;
 const modalTabs = ["Attributes", "Information", "FM Stag Stats", "Contract Info", "Transfer Status", "Medical Report", "History"];
 const attrTone = (value?: number) => value === undefined ? "missing" : value >= 16 ? "elite" : value >= 13 ? "good" : value >= 10 ? "okay" : "low";
+const ATTRIBUTE_LABELS: Record<string, string> = {
+  Fir: "First Touch", Fin: "Finishing", Pas: "Passing", Tec: "Technique", Dri: "Dribbling", Cro: "Crossing", Hea: "Heading", Tck: "Tackling", Lon: "Long Shots",
+  OtB: "Off The Ball", Tea: "Teamwork", Vis: "Vision", Dec: "Decisions", Ant: "Anticipation", Cmp: "Composure", Cnt: "Concentration", Pos: "Positioning", Fla: "Flair", Bra: "Bravery", Det: "Determination", Wor: "Work Rate",
+  Acc: "Acceleration", Pac: "Pace", Sta: "Stamina", Str: "Strength", Agi: "Agility", Bal: "Balance", Jum: "Jumping Reach", Nat: "Natural Fitness",
+  Ref: "Reflexes", "1v1": "One On Ones", Cmd: "Command Of Area", Kic: "Kicking", Thr: "Throwing", Han: "Handling", Aer: "Aerial Reach",
+};
 const POSITION_CODE_CACHE = new Map<string, Set<string>>();
 function positionCodes(position?: string) {
   const text = String(position ?? "").toUpperCase().replace(/\s+/g, "");
@@ -150,21 +156,22 @@ function PlayerModal({ player, roleId, slot, onClose }: { player: ScoredPlayer; 
   return <div className="backdrop" onClick={onClose}><aside className="modal fm-profile-modal" onClick={(e) => e.stopPropagation()}><button className="modal-close" onClick={onClose}>×</button>
     <section className="fm-profile-top">
       <div className="fm-player-card">
+        <div className="profile-logo-stack"><div className="flag-tile">{String(player.nationality ?? "NAT").slice(0, 3).toUpperCase()}</div><div className="club-tile">{player.club ? player.club.split(/\s+/).map((part) => part[0]).join("").slice(0, 3).toUpperCase() : "CLB"}</div></div>
         <div className="profile-photo-slot"><span>{player.name.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase()}</span></div>
-        <div className="profile-identity"><span className="eyebrow">Recruitment profile</span><h2>{player.name}</h2><p>{player.club || "Unknown club"} · {player.nationality || "Unknown nationality"}</p><div className="profile-tags"><span>{player.position || "Position unknown"}</span><span>{player.age ? `${player.age} yrs` : "Age unknown"}</span><span>{money(player)}</span></div></div>
-        <div className="profile-score-stack"><ScorePill label="Role" value={active.roleScore} /><ScorePill label="Recruitment" value={active.recruitmentScore} /><ScorePill label="Confidence" value={active.confidenceScore} /></div>
+        <div className="profile-status-chip">Int</div>
+        <div className="profile-name-strip"><strong>{player.name}</strong><span>Role {fmt(active.roleScore)} · Recruitment {fmt(active.recruitmentScore)} · Confidence {fmt(active.confidenceScore)}</span></div>
       </div>
       <div className="fm-info-card"><ProfileLine label="Nationality" value={player.nationality ?? "-"} /><ProfileLine label="Position" value={player.position ?? "-"} /><ProfileLine label="Age" value={player.age ?? "-"} /><ProfileLine label="Wage" value={`£${fmt(player.wageK)}k/w`} splitLabel="Value" splitValue={money(player)} /><ProfileLine label="Role" value={`${slot} · ${role.shortName}`} splitLabel="Best role" splitValue={`${bestRole.role.shortName} ${fmt(bestRole.score)}`} /><ProfileLine label="Minutes" value={fmt(player.minutes)} splitLabel="Status" splitValue={active.warnings.length ? `${active.warnings.length} warning${active.warnings.length === 1 ? "" : "s"}` : "Clear"} /><ProfileLine label="Preferred foot" value={player.preferredFoot ?? "-"} splitLabel="Left / right" splitValue={`${player.leftFoot ?? "-"} / ${player.rightFoot ?? "-"}`} /></div>
     </section>
     <div className="fm-tabs">{modalTabs.map((label, index) => <span className={index === 0 ? "active" : ""} key={label}>{label}</span>)}</div>
     <section className="fm-profile-body">
-      <div className="fm-position-panel"><h3>Position & role fit</h3><div className="position-summary"><strong>{player.position || "-"}</strong><span>Position/foot score {fmt(active.position.score)}</span><small>{[...active.caps, ...active.warnings].filter((note) => note.toLowerCase().includes("position")).join(", ") || "No position concerns from exported data."}</small></div><div className="foot-summary"><div><span>Left Foot</span><strong>{player.leftFoot ?? "-"}</strong></div><div><span>Right Foot</span><strong>{player.rightFoot ?? "-"}</strong></div></div><div className="fm-role-card"><strong>{role.shortName}</strong><span>{role.label}</span><b className={scoreClass(active.roleScore)}>{fmt(active.roleScore)}</b></div><div className="fm-role-list">{Object.values(ROLE_CONFIG).map((candidate) => <div className="role-bar" key={candidate.id}><span>{candidate.shortName}</span><i><b className={scoreClass(player.scores[candidate.id].roleScore)} style={{ width: `${player.scores[candidate.id].roleScore}%` }} /></i><strong className={scoreClass(player.scores[candidate.id].roleScore)}>{fmt(player.scores[candidate.id].roleScore)}</strong></div>)}</div></div>
+      <div className="fm-position-panel"><h3>Positions</h3><div className="skin-pitch"><span className="pitch-dot dot-st" /><span className="pitch-dot dot-lw" /><span className="pitch-dot dot-rw" /><span className="pitch-dot dot-cm" /></div><h3>Role and duty</h3><div className="fm-role-card"><strong>{role.shortName}</strong><span>{role.label}</span><b className={scoreClass(active.roleScore)}>{fmt(active.roleScore)}</b></div><div className="fm-role-list">{Object.values(ROLE_CONFIG).map((candidate) => <div className="role-bar" key={candidate.id}><span>{candidate.shortName}</span><i><b className={scoreClass(player.scores[candidate.id].roleScore)} style={{ width: `${player.scores[candidate.id].roleScore}%` }} /></i><strong className={scoreClass(player.scores[candidate.id].roleScore)}>{fmt(player.scores[candidate.id].roleScore)}</strong></div>)}</div></div>
       <section className="attribute-panel fm-attributes"><div className="attribute-groups">{ATTRIBUTE_GROUPS.map((group) => {
         const visible = group.keys.filter(([, key]) => player[key] !== undefined);
         if (!visible.length) return null;
         return <div className="attribute-group" key={group.label}><h4>{group.label}</h4>{visible.map(([label, key]) => {
           const value = player[key] as number | undefined, important = roleWeights.has(label);
-          return <div className={important ? "attribute-row important" : "attribute-row"} key={label}><span>{label}</span><strong className={attrTone(value)}>{value ?? "-"}</strong></div>;
+          return <div className={important ? "attribute-row important" : "attribute-row"} key={label}><span>{ATTRIBUTE_LABELS[label] ?? label}</span><strong className={attrTone(value)}>{value ?? "-"}</strong></div>;
         })}</div>;
       })}</div></section>
     </section>
