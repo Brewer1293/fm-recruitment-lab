@@ -784,6 +784,40 @@ tbody tr:hover { background: rgba(var(--accent-rgb),.18); cursor: pointer; }
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
 }
 
+.datahub-controls {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(280px, 1fr) 180px auto auto;
+  padding: 12px;
+}
+
+.datahub-controls label {
+  color: var(--muted);
+  display: grid;
+  font-size: 11px;
+  font-weight: 900;
+  gap: 5px;
+  text-transform: uppercase;
+}
+
+.datahub-controls select,
+.datahub-controls input {
+  background: rgb(18,18,18);
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 7px;
+  color: var(--text);
+  font-size: 14px;
+  min-height: 38px;
+  padding: 8px 10px;
+}
+
+.datahub-controls button {
+  min-height: 38px;
+  padding: 9px 12px;
+  white-space: nowrap;
+}
+
 .data-card {
   align-items: stretch;
   background: rgb(37,37,37);
@@ -834,6 +868,12 @@ tbody tr:hover { background: rgba(var(--accent-rgb),.18); cursor: pointer; }
 
 .mini-plot circle {
   fill: rgba(var(--accent-rgb), .8);
+}
+
+.mini-plot circle.leader-dot {
+  fill: var(--red);
+  stroke: white;
+  stroke-width: 1.2;
 }
 
 .datahub-detail {
@@ -924,6 +964,12 @@ tbody tr:hover { background: rgba(var(--accent-rgb),.18); cursor: pointer; }
 
 .scatter-wrap circle.elite-dot {
   fill: var(--green);
+}
+
+.scatter-wrap circle.leader-dot {
+  fill: var(--red);
+  stroke: white;
+  stroke-width: 2.2;
 }
 
 .scatter-wrap circle:hover {
@@ -2372,6 +2418,9 @@ code { color: var(--orange-2); }
     display: grid;
     gap: 12px;
   }
+  .datahub-controls {
+    grid-template-columns: 1fr 170px auto auto;
+  }
   .datahub-context {
     text-align: left;
   }
@@ -2391,6 +2440,7 @@ code { color: var(--orange-2); }
   .filter-toggle { width: 100%; }
   .settings-block, .theme-picker { grid-template-columns: 1fr; }
   .datahub-grid { grid-template-columns: 1fr; }
+  .datahub-controls { grid-template-columns: 1fr; }
   .data-chart-head, .shortlist-hero { align-items: stretch; display: grid; gap: 10px; }
   .scatter-meta { display: grid; }
   .import-panel { min-height: 0; }

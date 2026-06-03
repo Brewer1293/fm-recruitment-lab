@@ -15,7 +15,7 @@ type SortKey = "roleScore" | "recruitmentScore" | "confidenceScore" | "attribute
 type SuitabilityFilter = "role-position" | "conversion" | "all";
 type PositionFilter = "" | "GK" | "DL" | "DC" | "DR" | "WBL" | "WBR" | "DM" | "ML" | "MC" | "MR" | "AML" | "AMC" | "AMR" | "ST";
 type ThemeChoice = "orange" | "blue" | "emerald";
-const APP_VERSION = "v0.2.32-transfer-shortlist-local";
+const APP_VERSION = "v0.2.35-datahub-red-leader-dot-local";
 const THEME_STORAGE_KEY = "fm-recruitment-lab-theme";
 const SHORTLIST_STORAGE_KEY = "fm-recruitment-lab-shortlist";
 const THEME_OPTIONS: { value: ThemeChoice; label: string; description: string }[] = [
@@ -199,6 +199,7 @@ export default function Home() {
   const [roleId, setRoleId] = useState<RoleId>("af-at"), [slot, setSlot] = useState<SlotId>("ST");
   const [theme, setTheme] = useState<ThemeChoice>("orange");
   const [selected, setSelected] = useState<ScoredPlayer | null>(null), [compareIds, setCompareIds] = useState<string[]>([]), [shortlistIds, setShortlistIds] = useState<string[]>([]);
+  const [profileContext, setProfileContext] = useState<{ slot: SlotId; roleId: RoleId }>({ slot: "ST", roleId: "af-at" });
   const [dataHubCard, setDataHubCard] = useState<DataHubCardId>("attacking");
   const [search, setSearch] = useState(""), [minMinutes, setMinMinutes] = useState(0), [maxAge, setMaxAge] = useState(50);
   const [minAge, setMinAge] = useState(0), [club, setClub] = useState(""), [nation, setNation] = useState(""), [positionFilter, setPositionFilter] = useState<PositionFilter>(""), [foot, setFoot] = useState("");
@@ -232,7 +233,7 @@ export default function Home() {
   const compared = players.filter((player) => compareIds.includes(player.id));
   const shortlisted = shortlistIds.map((id) => players.find((player) => player.id === id)).filter((player): player is ScoredPlayer => Boolean(player));
   const stagBenchmarks = useMemo(() => buildStagBenchmarks(players), [players]);
-  const modalPlayers = tab === "shortlist" ? shortlisted : rankings;
+  const modalPlayers = tab === "shortlist" ? shortlisted : tab === "rankings" ? rankings : [];
   const selectedRankIndex = selected ? modalPlayers.findIndex((player) => player.id === selected.id) : -1;
 
   useEffect(() => {
@@ -281,12 +282,14 @@ export default function Home() {
   function selectSlot(nextSlot: SlotId, nextRole: RoleId) {
     setSlot(nextSlot);
     setRoleId(nextRole);
+    setProfileContext({ slot: nextSlot, roleId: nextRole });
     setSortKey("roleScore");
     setSortDirection("desc");
     setSuitabilityFilter("role-position");
     setSelected(null);
     setTab("rankings");
   }
+  function openPlayer(player: ScoredPlayer, context = { slot, roleId }) { setProfileContext(context); setSelected(player); }
   function toggleCompare(id: string) { setCompareIds((current) => current.includes(id) ? current.filter((value) => value !== id) : current.length < 4 ? [...current, id] : current); }
   function toggleShortlist(id: string) { setShortlistIds((current) => current.includes(id) ? current.filter((value) => value !== id) : [...current, id]); }
   function clearData() { setPlayers([]); setReport(null); setCompareIds([]); setShortlistIds([]); setSelected(null); setTab("import"); }
@@ -315,13 +318,13 @@ export default function Home() {
       {filtersOpen && <><div className="filter-grid"><label>Search<input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Player or club" /></label><label>Club<input value={club} onChange={(e) => setClub(e.target.value)} placeholder="Any club" /></label><label>Nation<input value={nation} onChange={(e) => setNation(e.target.value)} placeholder="Any nation" /></label><label>Position<select value={positionFilter} onChange={(e) => setPositionFilter(e.target.value as PositionFilter)}>{POSITION_OPTIONS.map((option) => <option key={option.value || "all"} value={option.value}>{option.label}</option>)}</select></label><label>Role suitability<select value={suitabilityFilter} onChange={(e) => setSuitabilityFilter(e.target.value as SuitabilityFilter)}><option value="role-position">Role position only</option><option value="conversion">Include conversions</option><option value="all">All players</option></select></label><label>Footedness<input value={foot} onChange={(e) => setFoot(e.target.value)} placeholder="left / right / either" /></label><label>Minimum minutes<input type="number" value={minMinutes} onChange={(e) => setMinMinutes(Number(e.target.value))} /></label><label>Minimum age<input type="number" value={minAge} onChange={(e) => setMinAge(Number(e.target.value))} /></label><label>Maximum age<input type="number" value={maxAge} onChange={(e) => setMaxAge(Number(e.target.value))} /></label><label>Maximum wage £k/w<input type="number" value={maxWage} onChange={(e) => setMaxWage(Number(e.target.value))} /></label><label>Maximum value £m<input type="number" value={maxValue} onChange={(e) => setMaxValue(Number(e.target.value))} /></label><label>Minimum Role Score<input type="number" value={minScore} onChange={(e) => setMinScore(Number(e.target.value))} /></label></div>
       <div className="toggles"><label><input type="checkbox" checked={includeMissingStats} onChange={(e) => setIncludeMissingStats(e.target.checked)} /> Include missing stats</label><label><input type="checkbox" checked={includeMissingHidden} onChange={(e) => setIncludeMissingHidden(e.target.checked)} /> Include missing hidden data</label>
       <button onClick={() => exportCSV(`${slot}-${roleId}-rankings.csv`, rankings, rankingScores)}>Export CSV</button><button onClick={() => exportHTML(`${slot}-${roleId}-rankings.html`, rankings, rankingScores)}>Export HTML</button></div></>}</section>
-      <RankTable players={rankings.slice(0, 500)} total={rankings.length} scores={rankingScores} compareIds={compareIds} shortlistIds={shortlistIds} sort={sort} onOpen={setSelected} onCompare={toggleCompare} onShortlist={toggleShortlist} /></section>}
-    {tab === "datahub" && <DataHub players={players} roleId={roleId} slot={slot} activeCardId={dataHubCard} onCardChange={setDataHubCard} onOpen={setSelected} />}
-    {tab === "shortlist" && <Shortlist players={shortlisted} scores={rankingScores} compareIds={compareIds} shortlistIds={shortlistIds} onOpen={setSelected} onCompare={toggleCompare} onShortlist={toggleShortlist} onClear={() => setShortlistIds([])} onExport={() => exportCSV("fm-recruitment-shortlist.csv", shortlisted, rankingScores)} />}
+      <RankTable players={rankings.slice(0, 500)} total={rankings.length} scores={rankingScores} compareIds={compareIds} shortlistIds={shortlistIds} sort={sort} onOpen={(player) => openPlayer(player)} onCompare={toggleCompare} onShortlist={toggleShortlist} /></section>}
+    {tab === "datahub" && <DataHub players={players} roleId={roleId} slot={slot} activeCardId={dataHubCard} onCardChange={setDataHubCard} onOpen={openPlayer} />}
+    {tab === "shortlist" && <Shortlist players={shortlisted} scores={rankingScores} compareIds={compareIds} shortlistIds={shortlistIds} onOpen={(player) => openPlayer(player)} onCompare={toggleCompare} onShortlist={toggleShortlist} onClear={() => setShortlistIds([])} onExport={() => exportCSV("fm-recruitment-shortlist.csv", shortlisted, rankingScores)} />}
     {tab === "compare" && <Comparison players={compared} roleId={roleId} onExport={() => exportCSV("fm-recruitment-comparison.csv", compared)} />}
     {tab === "instructions" && <Instructions />}
     {tab === "settings" && <Settings report={report} theme={theme} benchmarks={stagBenchmarks} onThemeChange={setTheme} onTactic={() => setTab("tactic")} onExport={() => exportCSV("fm-recruitment-full-scored-dataset.csv", players)} />}
-    {selected && <PlayerModal player={selected} slot={slot} roleId={roleId} benchmarks={stagBenchmarks} rankIndex={selectedRankIndex} rankTotal={modalPlayers.length} onPrevious={selectedRankIndex > 0 ? () => selectAdjacentPlayer(-1) : undefined} onNext={selectedRankIndex >= 0 && selectedRankIndex < modalPlayers.length - 1 ? () => selectAdjacentPlayer(1) : undefined} onClose={() => setSelected(null)} />}
+    {selected && <PlayerModal player={selected} slot={profileContext.slot} roleId={profileContext.roleId} benchmarks={stagBenchmarks} rankIndex={selectedRankIndex} rankTotal={modalPlayers.length} onPrevious={selectedRankIndex > 0 ? () => selectAdjacentPlayer(-1) : undefined} onNext={selectedRankIndex >= 0 && selectedRankIndex < modalPlayers.length - 1 ? () => selectAdjacentPlayer(1) : undefined} onClose={() => setSelected(null)} />}
     <div className="app-version">{APP_VERSION}</div>
   </main>;
 }
@@ -348,32 +351,37 @@ function RankTable({ players, total, scores, compareIds, shortlistIds, sort, onO
   const heads: [SortKey | "name" | "club" | "position" | "valueM" | "wageK" | "apps" | "goals" | "assists", string][] = [["name", "Player"], ["age", "Age"], ["club", "Club"], ["position", "Position"], ["valueM", "FM Value"], ["wageK", "Wage"], ["roleScore", "Role Score"], ["recruitmentScore", "Recruitment"], ["confidenceScore", "Confidence"], ["attribute", "Attribute"], ["stats", "Adj Stats"], ["hidden", "Hidden/Profile"], ["position", "Position Score"], ["value", "Value Score"], ["apps", "Apps"], ["goals", "Goals"], ["assists", "Assists"], ["minutes", "Mins"], ["averageRating", "Av Rat"]];
   return <section className="panel table-panel"><div className="panel-head"><strong>{total.toLocaleString()} scouting matches</strong><span>{total > players.length ? `Showing first ${players.length.toLocaleString()} results` : "Showing all results"}</span></div>{!players.length ? <div className="empty-state">No players match the current filters.</div> : <div className="table-scroll"><table><thead><tr><th>#</th><th>Compare</th><th>Shortlist</th>{heads.map(([key, label]) => <th key={`${key}-${label}`} onClick={() => sort(key as SortKey)}>{label}</th>)}<th>Caps</th><th>Warnings</th></tr></thead><tbody>{players.map((player, index) => { const score = scores.get(player.id)!; return <tr key={player.id} onClick={() => onOpen(player)}><td>{index + 1}</td><td><button title="Compare player" className={compareIds.includes(player.id) ? "table-action active" : "table-action"} onClick={(e) => { e.stopPropagation(); onCompare(player.id); }}>+</button></td><td><button title="Toggle shortlist" className={shortlistIds.includes(player.id) ? "table-action shortlist active" : "table-action shortlist"} onClick={(e) => { e.stopPropagation(); onShortlist(player.id); }}>★</button></td><td><strong>{player.name}</strong><small>{player.nationality}</small></td><td>{fmt(player.age, 0)}</td><td>{player.club}</td><td>{player.position}</td><td>{money(player)}</td><td>{compactWage(player.wageK)}</td><td className={scoreClass(score.roleScore)}>{fmt(score.roleScore)}</td><td>{fmt(score.recruitmentScore)}</td><td>{fmt(score.confidenceScore)}</td><td>{fmt(score.attribute.score)}</td><td>{fmt(score.stats.score)}</td><td>{fmt(score.hidden.score)}</td><td>{fmt(score.position.score)}</td><td>{fmt(score.value.score)}</td><td>{fmt(apps(player), 0)}</td><td>{fmt(goals(player), 0)}</td><td>{fmt(assists(player), 0)}</td><td>{fmt(player.minutes, 0)}</td><td>{fmt(player.averageRating, 2)}</td><td>{score.caps.join(", ") || "-"}</td><td>{score.warnings[0] ?? "-"}</td></tr>; })}</tbody></table></div>}</section>;
 }
-function DataHub({ players, roleId, slot, activeCardId, onCardChange, onOpen }: { players: ScoredPlayer[]; roleId: RoleId; slot: SlotId; activeCardId: DataHubCardId; onCardChange: (id: DataHubCardId) => void; onOpen: (player: ScoredPlayer) => void }) {
+function DataHub({ players, roleId, slot, activeCardId, onCardChange, onOpen }: { players: ScoredPlayer[]; roleId: RoleId; slot: SlotId; activeCardId: DataHubCardId; onCardChange: (id: DataHubCardId) => void; onOpen: (player: ScoredPlayer, context?: { slot: SlotId; roleId: RoleId }) => void }) {
+  const [hubSlot, setHubSlot] = useState<SlotId>(slot);
+  const [hubRoleId, setHubRoleId] = useState<RoleId>(roleId);
+  const [hubMinMinutes, setHubMinMinutes] = useState(450);
   const activeCard = DATA_HUB_CARDS.find((card) => card.id === activeCardId) ?? DATA_HUB_CARDS[0];
-  const context = `${slot} · ${roleDisplayName(ROLE_CONFIG[roleId])}`;
+  const context = `${hubSlot} · ${roleDisplayName(ROLE_CONFIG[hubRoleId])}`;
+  const openInHubContext = (player: ScoredPlayer) => onOpen(player, { slot: hubSlot, roleId: hubRoleId });
   const suitableCandidates = useMemo(() => players.map((player) => {
-    const score = scoreForSlot(player, roleId, slot);
+    const score = scoreForSlot(player, hubRoleId, hubSlot);
     return Number(score.position.score ?? 0) >= 80 ? { player, score } : undefined;
-  }).filter((entry): entry is DataHubCandidate => Boolean(entry)), [players, roleId, slot]);
-  const cardPoints = useMemo(() => Object.fromEntries(DATA_HUB_CARDS.map((card) => [card.id, buildDataHubPoints(suitableCandidates, card)])) as Record<DataHubCardId, DataHubPoint[]>, [suitableCandidates]);
+  }).filter((entry): entry is DataHubCandidate => Boolean(entry)), [players, hubRoleId, hubSlot]);
+  const cardPoints = useMemo(() => Object.fromEntries(DATA_HUB_CARDS.map((card) => [card.id, buildDataHubPoints(suitableCandidates, card, hubMinMinutes)])) as Record<DataHubCardId, DataHubPoint[]>, [suitableCandidates, hubMinMinutes]);
   const points = cardPoints[activeCard.id] ?? [];
   const leaders = [...points].sort((a, b) => b.impact - a.impact).slice(0, 6);
 
   return <section className="datahub">
     <section className="datahub-header"><div><span className="eyebrow">Performance</span><h2>Data Hub</h2><p>Interactive analytics from the loaded FM export. Charts use role-suitable players for the current tactic slot.</p></div><div className="datahub-context"><span>Current view</span><strong>{context}</strong><small>{suitableCandidates.length.toLocaleString()} qualified players</small></div></section>
+    <section className="panel datahub-controls"><label>Role / slot<select value={hubSlot} onChange={(event) => { const next = TACTIC_SLOTS.find((item) => item.id === event.target.value) ?? TACTIC_SLOTS[0]; setHubSlot(next.id); setHubRoleId(next.roleId); }}>{TACTIC_SLOTS.map((item) => <option key={item.id} value={item.id}>{item.id} · {roleDisplayName(ROLE_CONFIG[item.roleId])}</option>)}</select></label><label>Minimum minutes<input type="number" min="0" step="90" value={hubMinMinutes} onChange={(event) => setHubMinMinutes(Math.max(0, Number(event.target.value) || 0))} /></label><button type="button" onClick={() => setHubMinMinutes(0)}>All minutes</button><button type="button" onClick={() => setHubMinMinutes(900)}>900+ mins</button></section>
     <section className="datahub-grid">{DATA_HUB_CARDS.map((card) => {
       const previewPoints = cardPoints[card.id] ?? [];
       const preview = [...previewPoints].sort((a, b) => b.impact - a.impact)[0];
       return <button key={card.id} className={activeCard.id === card.id ? "data-card active" : "data-card"} onClick={() => onCardChange(card.id)}><span>{card.title}</span><strong>{preview ? preview.player.name : "-"}</strong><small>{card.subtitle}</small><DataMiniPlot points={previewPoints} /></button>;
     })}</section>
     <section className="datahub-detail">
-      <article className="panel data-chart-panel"><div className="data-chart-head"><div><span className="eyebrow">{activeCard.subtitle}</span><h3>{activeCard.title}</h3><p>{activeCard.description}</p></div><div><strong>{points.length.toLocaleString()}</strong><span>chart players</span></div></div><DataScatterPlot card={activeCard} points={points} onOpen={onOpen} /></article>
-      <article className="panel data-leaders"><span className="eyebrow">Metric leaders</span><h3>{activeCard.title}</h3>{leaders.length ? leaders.map((point, index) => <button key={point.player.id} onClick={() => onOpen(point.player)}><span>{index + 1}</span><strong>{point.player.name}<small>{point.player.club ?? "-"} · {fmt(point.player.minutes, 0)} mins</small></strong><em>{formatDataMetric(point.y, activeCard.y)}</em></button>) : <p className="empty-note">No players have enough exported data for this chart.</p>}</article>
+      <article className="panel data-chart-panel"><div className="data-chart-head"><div><span className="eyebrow">{activeCard.subtitle}</span><h3>{activeCard.title}</h3><p>{activeCard.description}</p></div><div><strong>{points.length.toLocaleString()}</strong><span>{hubMinMinutes.toLocaleString()}+ mins</span></div></div><DataScatterPlot card={activeCard} points={points} onOpen={openInHubContext} /></article>
+      <article className="panel data-leaders"><span className="eyebrow">Metric leaders</span><h3>{activeCard.title}</h3>{leaders.length ? leaders.map((point, index) => <button key={point.player.id} onClick={() => openInHubContext(point.player)}><span>{index + 1}</span><strong>{point.player.name}<small>{point.player.club ?? "-"} · {fmt(point.player.minutes, 0)} mins</small></strong><em>{formatDataMetric(point.y, activeCard.y)}</em></button>) : <p className="empty-note">No players have enough exported data for this chart.</p>}</article>
     </section>
   </section>;
 }
-function buildDataHubPoints(candidates: DataHubCandidate[], card: DataHubCardConfig): DataHubPoint[] {
-  return candidates.filter(({ player }) => Number(player.minutes ?? 0) >= card.minMinutes).map(({ player, score }) => {
+function buildDataHubPoints(candidates: DataHubCandidate[], card: DataHubCardConfig, minMinutes: number): DataHubPoint[] {
+  return candidates.filter(({ player }) => Number(player.minutes ?? 0) >= minMinutes).map(({ player, score }) => {
     const x = dataMetricValue(player, card.x, score), y = dataMetricValue(player, card.y, score);
     if (x === undefined || y === undefined) return undefined;
     const roleScore = score.roleScore;
@@ -401,6 +409,7 @@ function chartExtent(values: number[]) {
 }
 function DataScatterPlot({ card, points, onOpen }: { card: DataHubCardConfig; points: DataHubPoint[]; onOpen: (player: ScoredPlayer) => void }) {
   const visiblePoints = points.slice().sort((a, b) => a.roleScore - b.roleScore).slice(-900);
+  const leaderId = [...points].sort((a, b) => b.impact - a.impact)[0]?.player.id;
   const xExtent = chartExtent(visiblePoints.map((point) => point.x)), yExtent = chartExtent(visiblePoints.map((point) => point.y));
   const xScale = (value: number) => 48 + ((value - xExtent.min) / (xExtent.max - xExtent.min)) * 604;
   const yScale = (value: number) => 318 - ((value - yExtent.min) / (yExtent.max - yExtent.min)) * 260;
@@ -410,17 +419,21 @@ function DataScatterPlot({ card, points, onOpen }: { card: DataHubCardConfig; po
     {[0, 1, 2, 3].map((tick) => <g key={tick}><line x1={48 + tick * 151} x2={48 + tick * 151} y1="38" y2="318" /><line x1="48" x2="652" y1={58 + tick * 86} y2={58 + tick * 86} /></g>)}
     <line className="avg-line" x1={xScale(avgX)} x2={xScale(avgX)} y1="38" y2="318" /><line className="avg-line" x1="48" x2="652" y1={yScale(avgY)} y2={yScale(avgY)} />
     <text x="50" y="30">{card.y.label}</text><text x="652" y="342" textAnchor="end">{card.x.label}</text>
-    {visiblePoints.map((point) => <circle key={point.player.id} className={point.roleScore >= 80 ? "elite-dot" : point.roleScore >= 65 ? "good-dot" : ""} cx={xScale(point.x)} cy={yScale(point.y)} r={point.roleScore >= 80 ? 5 : 4} onClick={() => onOpen(point.player)}>
+    {visiblePoints.map((point) => {
+      const isLeader = point.player.id === leaderId;
+      return <circle key={point.player.id} className={isLeader ? "leader-dot" : point.roleScore >= 80 ? "elite-dot" : point.roleScore >= 65 ? "good-dot" : ""} cx={xScale(point.x)} cy={yScale(point.y)} r={isLeader ? 7 : point.roleScore >= 80 ? 5 : 4} onClick={() => onOpen(point.player)}>
       <title>{`${point.player.name} · ${point.player.club ?? "-"}\n${card.x.label}: ${formatDataMetric(point.x, card.x)}\n${card.y.label}: ${formatDataMetric(point.y, card.y)}\nRole Score: ${fmt(point.roleScore)}`}</title>
-    </circle>)}
+    </circle>;
+    })}
   </svg><div className="scatter-meta"><span>{card.x.inverse ? "Lower/right depends on context" : "Further right is stronger"}</span><span>{card.y.inverse ? "Lower is stronger" : "Higher is stronger"}</span><span>Hover dots for player details, click to open profile.</span></div></div>;
 }
 function DataMiniPlot({ points }: { points: DataHubPoint[] }) {
   const sample = points.slice().sort((a, b) => b.impact - a.impact).slice(0, 18);
+  const leaderId = sample[0]?.player.id;
   const xExtent = chartExtent(sample.map((point) => point.x)), yExtent = chartExtent(sample.map((point) => point.y));
   const xScale = (value: number) => 8 + ((value - xExtent.min) / (xExtent.max - xExtent.min)) * 78;
   const yScale = (value: number) => 48 - ((value - yExtent.min) / (yExtent.max - yExtent.min)) * 38;
-  return <svg className="mini-plot" viewBox="0 0 94 58" aria-hidden="true"><line x1="8" x2="86" y1="48" y2="48" /><line x1="8" x2="8" y1="10" y2="48" />{sample.map((point) => <circle key={point.player.id} cx={xScale(point.x)} cy={yScale(point.y)} r="2.5" />)}</svg>;
+  return <svg className="mini-plot" viewBox="0 0 94 58" aria-hidden="true"><line x1="8" x2="86" y1="48" y2="48" /><line x1="8" x2="8" y1="10" y2="48" />{sample.map((point) => <circle key={point.player.id} className={point.player.id === leaderId ? "leader-dot" : ""} cx={xScale(point.x)} cy={yScale(point.y)} r={point.player.id === leaderId ? "3.8" : "2.5"} />)}</svg>;
 }
 function Shortlist({ players, scores, compareIds, shortlistIds, onOpen, onCompare, onShortlist, onClear, onExport }: { players: ScoredPlayer[]; scores: Map<string, RoleScore>; compareIds: string[]; shortlistIds: string[]; onOpen: (player: ScoredPlayer) => void; onCompare: (id: string) => void; onShortlist: (id: string) => void; onClear: () => void; onExport: () => void }) {
   return <section className="shortlist-layout"><section className="panel shortlist-hero"><div><span className="eyebrow">Transfer desk</span><h2>Shortlist</h2><p>Track targets by cost, contract, club context and current role fit before moving the best options into Compare.</p></div><div className="shortlist-actions"><button disabled={!players.length} onClick={onExport}>Export CSV</button><button disabled={!players.length} onClick={onClear}>Clear shortlist</button></div></section>

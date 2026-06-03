@@ -6,6 +6,8 @@ Update this file before each live push to the standalone FM app.
 
 ## Unreleased
 
+- Highlighted the leading player dot on Data Hub charts and mini plots in red for quicker scanning.
+- Added Data Hub role/slot and minimum-minutes controls so analytics can be explored without returning to Tactic.
 - Changed Shortlist into a transfer-focused view with value, wage, contract, expiry, playing time and league context columns.
 - Added a local interactive Data Hub with FM-style analytics cards, scatter charts, hoverable player dots and metric leaders.
 - Added a local Shortlist tab and Scouting star action for collecting broader recruitment targets.
