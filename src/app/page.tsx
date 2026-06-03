@@ -12,6 +12,7 @@ type Tab = "tactic" | "rankings" | "import" | "validation" | "compare" | "settin
 type SortKey = "roleScore" | "recruitmentScore" | "confidenceScore" | "attribute" | "stats" | "hidden" | "position" | "value" | "age" | "minutes" | "averageRating";
 type SuitabilityFilter = "role-position" | "conversion" | "all";
 type PositionFilter = "" | "GK" | "DL" | "DC" | "DR" | "WBL" | "WBR" | "DM" | "ML" | "MC" | "MR" | "AML" | "AMC" | "AMR" | "ST";
+const APP_VERSION = "v0.2.1-b7892d8b";
 const fmt = (value?: number, dp = 1) => value === undefined ? "-" : value.toFixed(dp);
 const scoreClass = (value?: number) => value === undefined ? "" : value >= 80 ? "elite" : value >= 65 ? "good" : value >= 50 ? "okay" : "low";
 const compactMoney = (value?: number) => {
@@ -203,6 +204,7 @@ export default function Home() {
     {tab === "compare" && <Comparison players={compared} onExport={() => exportCSV("fm-recruitment-comparison.csv", compared)} />}
     {tab === "settings" && <Settings onExport={() => exportCSV("fm-recruitment-full-scored-dataset.csv", players)} />}
     {selected && <PlayerModal player={selected} slot={slot} roleId={roleId} onClose={() => setSelected(null)} />}
+    <div className="app-version">{APP_VERSION}</div>
   </main>;
 }
 

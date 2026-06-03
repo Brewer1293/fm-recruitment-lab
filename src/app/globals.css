@@ -1048,6 +1048,19 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
 .role-bar i { background: rgb(25,25,25); border-radius: 0; height: 6px; overflow: hidden; }
 .role-bar b { background: currentColor; display: block; height: 100%; }
 code { color: var(--orange-2); }
+.app-version {
+  background: rgba(18,18,18,.82);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 7px;
+  bottom: 8px;
+  color: rgba(244,244,244,.52);
+  font-size: 11px;
+  line-height: 1;
+  padding: 6px 8px;
+  position: fixed;
+  right: 8px;
+  z-index: 4;
+}
 
 @media (max-width: 720px) {
   .shell { margin-left: 0; padding: 12px; }
