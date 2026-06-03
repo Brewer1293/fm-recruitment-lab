@@ -56,7 +56,8 @@ const GOALKEEPER_ATTRIBUTE_GROUPS = [
   { label: "Mental", keys: [["OtB", "otb"], ["Tea", "tea"], ["Vis", "vis"], ["Dec", "dec"], ["Ant", "ant"], ["Cmp", "cmp"], ["Cnt", "cnt"], ["Pos", "pos"], ["Fla", "fla"], ["Bra", "bra"], ["Det", "det"], ["Wor", "wor"]] },
   { label: "Physical", keys: [["Acc", "acc"], ["Pac", "pac"], ["Sta", "sta"], ["Str", "str"], ["Agi", "agi"], ["Bal", "bal"], ["Jum", "jum"], ["Nat", "nat"]] },
 ] as const;
-const modalTabs = ["Attributes", "Information", "FM Stag Stats", "Contract Info", "Transfer Status", "Medical Report", "History"];
+const modalTabs = ["Attributes", "Information", "FM Stag Stats", "Contract Info", "Transfer Status", "Medical Report", "History"] as const;
+type ModalTab = typeof modalTabs[number];
 const attrTone = (value?: number) => value === undefined ? "missing" : value >= 16 ? "elite" : value >= 13 ? "good" : value >= 10 ? "okay" : "low";
 const ATTRIBUTE_LABELS: Record<string, string> = {
   Fir: "First Touch", Fin: "Finishing", Pas: "Passing", Tec: "Technique", Dri: "Dribbling", Cro: "Crossing", Hea: "Heading", Tck: "Tackling", Lon: "Long Shots",
@@ -65,6 +66,15 @@ const ATTRIBUTE_LABELS: Record<string, string> = {
   Ref: "Reflexes", "1v1": "One On Ones", Cmd: "Command Of Area", Kic: "Kicking", Thr: "Throwing", Han: "Handling", Aer: "Aerial Reach", Com: "Communication", Ecc: "Eccentricity", Pun: "Punching", TRO: "Rushing Out",
 };
 const isGoalkeeper = (player: ScoredPlayer) => positionCodes(player.position).has("GK");
+const textValue = (value: unknown) => value === undefined || value === null || value === "" ? "-" : String(value);
+const field = (player: ScoredPlayer, ...keys: string[]) => {
+  for (const key of keys) {
+    const value = player[key];
+    if ((typeof value === "string" || typeof value === "number") && value !== "") return value;
+  }
+  return undefined;
+};
+const statValue = (player: ScoredPlayer, key: string, dp = 2, suffix = "") => typeof player[key] === "number" ? `${(player[key] as number).toFixed(dp)}${suffix}` : "-";
 const POSITION_CODE_CACHE = new Map<string, Set<string>>();
 function positionCodes(position?: string) {
   const text = String(position ?? "").toUpperCase().replace(/\s+/g, "");
@@ -182,6 +192,7 @@ function Settings({ onExport }: { onExport: () => void }) {
   return <section className="panel settings"><span className="eyebrow">Scoring transparency</span><h2>{PRESET_VERSION}</h2><p>Role Score is pure role fit: 70% attributes, 15% position/foot, 10% hidden/profile and 5% shrunken stats. Recruitment Score adds market value, wage and age/development.</p><button onClick={onExport}>Export full scored dataset CSV</button>{Object.values(ROLE_CONFIG).map((role) => <details key={role.id}><summary><strong>{role.shortName}</strong> · {role.label}</summary><p><b>Attribute weights:</b> {Object.entries(role.attributeWeights).map(([key, weight]) => `${key} ${weight}`).join(", ")}</p><p><b>Positive stats:</b> {Object.entries(role.positiveStatWeights).map(([key, weight]) => `${key} ${weight}`).join(", ")}</p><p><b>Floor penalties:</b> {role.floorPenalties.map((p) => `${p.attribute}<${p.lt}: -${p.minus}`).join(", ") || "None"}</p></details>)}</section>;
 }
 function PlayerModal({ player, roleId, slot, onClose }: { player: ScoredPlayer; roleId: RoleId; slot: SlotId; onClose: () => void }) {
+  const [profileTab, setProfileTab] = useState<ModalTab>("Attributes");
   const active = scoreForSlot(player, roleId, slot), role = ROLE_CONFIG[roleId];
   const roleWeights = new Set(Object.keys(role.attributeWeights).filter((key) => role.attributeWeights[key] >= 7));
   const bestRole = Object.values(ROLE_CONFIG).map((candidate) => ({ role: candidate, score: player.scores[candidate.id].roleScore })).sort((a, b) => b.score - a.score)[0];
@@ -197,8 +208,8 @@ function PlayerModal({ player, roleId, slot, onClose }: { player: ScoredPlayer; 
       </div>
       <div className="fm-info-card"><ProfileLine label="Nationality" value={player.nationality ?? "-"} splitLabel="Nation UID" splitValue={nationUid ?? "-"} /><ProfileLine label="Position" value={player.position ?? "-"} /><ProfileLine label="Age" value={player.age ?? "-"} splitLabel="Height" splitValue={height(player.height)} /><ProfileLine label="Wage" value={compactWage(player.wageK)} splitLabel="Value" splitValue={money(player)} /><ProfileLine label="Role" value={`${slot} · ${role.shortName}`} splitLabel="Best role" splitValue={`${bestRole.role.shortName} ${fmt(bestRole.score)}`} /><ProfileLine label="Minutes" value={fmt(player.minutes, 0)} splitLabel="Club UID" splitValue={clubUid ?? "-"} /></div>
     </section>
-    <div className="fm-tabs">{modalTabs.map((label, index) => <span className={index === 0 ? "active" : ""} key={label}>{label}</span>)}</div>
-    <section className="fm-profile-body">
+    <div className="fm-tabs">{modalTabs.map((label) => <button className={profileTab === label ? "active" : ""} key={label} type="button" onClick={() => setProfileTab(label)}>{label}</button>)}</div>
+    {profileTab === "Attributes" ? <><section className="fm-profile-body">
       <div className="fm-position-panel"><h3>Positions</h3><div className="skin-pitch"><span className="pitch-dot dot-st" /><span className="pitch-dot dot-lw" /><span className="pitch-dot dot-rw" /><span className="pitch-dot dot-cm" /></div><h3>Role and duty</h3><div className="fm-role-card"><strong>{role.shortName}</strong><span>{role.label}</span><b className={scoreClass(active.roleScore)}>{fmt(active.roleScore)}</b></div><div className="fm-role-list">{Object.values(ROLE_CONFIG).map((candidate) => <div className="role-bar" key={candidate.id}><span>{candidate.shortName}</span><i><b className={scoreClass(player.scores[candidate.id].roleScore)} style={{ width: `${player.scores[candidate.id].roleScore}%` }} /></i><strong className={scoreClass(player.scores[candidate.id].roleScore)}>{fmt(player.scores[candidate.id].roleScore)}</strong></div>)}</div></div>
       <section className="attribute-panel fm-attributes"><div className="attribute-groups">{(isGoalkeeper(player) ? GOALKEEPER_ATTRIBUTE_GROUPS : ATTRIBUTE_GROUPS).map((group) => {
         const visible = group.keys.filter(([, key]) => player[key] !== undefined);
@@ -209,12 +220,42 @@ function PlayerModal({ player, roleId, slot, onClose }: { player: ScoredPlayer; 
         })}</div>;
       })}</div></section>
     </section>
-    <section className="fm-bottom-panels"><div><h3>Strengths</h3><strong>{active.strengths.join(", ") || "No standout exported attributes available."}</strong></div><div><h3>Score breakdown</h3><Breakdown score={active} /></div><div><h3>Scoring notes</h3><p>{active.explanation.join(" ")}</p><p>{[...active.caps, ...active.weaknesses, ...active.warnings].join(", ") || "No major exported-data concerns."}</p></div></section>
+    <section className="fm-bottom-panels"><div><h3>Strengths</h3><strong>{active.strengths.join(", ") || "No standout exported attributes available."}</strong></div><div><h3>Score breakdown</h3><Breakdown score={active} /></div><div><h3>Scoring notes</h3><p>{active.explanation.join(" ")}</p><p>{[...active.caps, ...active.weaknesses, ...active.warnings].join(", ") || "No major exported-data concerns."}</p></div></section></> : <ProfileTabContent tab={profileTab} player={player} score={active} />}
   </aside></div>;
 }
 function AssetImage({ src, alt, fallback }: { src?: string; alt: string; fallback: string }) {
   const [failed, setFailed] = useState(false);
   return src && !failed ? <img src={src} alt={alt} onError={() => setFailed(true)} /> : <span>{fallback}</span>;
+}
+function ProfileTabContent({ tab, player, score }: { tab: Exclude<ModalTab, "Attributes">; player: ScoredPlayer; score: RoleScore }) {
+  if (tab === "Information") return <section className="fm-tab-panel info-tab"><div className="fm-card-block"><h3>Personal Information</h3><InfoGrid rows={[["Full Name", player.name], ["Personality", field(player, "personality")], ["Media Description", field(player, "mediaDescription")], ["Media Handling", field(player, "mediaHandling")], ["Preferred Foot", field(player, "preferredFoot")], ["Height", height(player.height)], ["Club", player.club], ["Division", player.division]]} /></div><div className="fm-card-block wide"><h3>Nationalities</h3><InfoGrid rows={[["Nationality", player.nationality], ["Second Nationality", player.secondNationality], ["Based", field(player, "basedIn", "based")], ["Position", player.position], ["UID", player.uid], ["Age", player.age]]} /></div></section>;
+
+  if (tab === "FM Stag Stats") return <section className="fm-tab-panel stats-tab"><div className="fm-role-tabs"><span className="active">{isGoalkeeper(player) ? "GK" : "Role"}</span><span>FB</span><span>WB</span><span>CB</span><span>BPD</span><span>DM</span><span>CM</span><span>AM</span><span>C-WA</span><span>G-WA</span><span>C-ST</span><span>G-ST</span></div><h3>{isGoalkeeper(player) ? "Goalkeeping across the 'Big 5' leagues" : "Performance across the 'Big 5' leagues"}</h3><table className="fm-stat-table"><thead><tr><th>{isGoalkeeper(player) ? "Goalkeeping - Defensive" : "Role performance"}</th><th>Poor</th><th>Average</th><th>Good</th><th>Rating</th></tr></thead><tbody>{statRows(player).map((row) => <tr key={row.label}><td>{row.label}</td><td className="low">{row.poor}</td><td className="average">{row.average}</td><td className="good">{row.good}</td><td className="rating">{row.rating}</td></tr>)}</tbody></table></section>;
+
+  if (tab === "Contract Info") return <section className="fm-tab-panel contract-tab"><div className="fm-card-block"><h3>{player.club ?? "Current Club"}</h3><div className="contract-hero"><strong>{compactWage(player.wageK)} per week</strong><span>{money(player)} transfer value</span></div><InfoGrid rows={[["Contract Type", field(player, "contractType") ?? "Not exported"], ["Expires", field(player, "contractExpires") ?? "Not exported"], ["Started", field(player, "contractStarted") ?? "Not exported"], ["Playing Time", field(player, "playingTime") ?? "Not exported"], ["Wage", compactWage(player.wageK)], ["Value", money(player)]]} /></div><div className="fm-card-block"><h3>Bonuses</h3><InfoGrid rows={[["Appearance Fee", field(player, "appearanceFee") ?? "Not exported"], ["Goal Bonus", field(player, "goalBonus") ?? "Not exported"], ["Unused Substitute Fee", field(player, "unusedSubFee") ?? "Not exported"], ["Loyalty Bonus", field(player, "loyaltyBonus") ?? "Not exported"]]} /></div><div className="fm-card-block"><h3>Clauses</h3><InfoGrid rows={[["Release Clause", field(player, "releaseClause") ?? "Not exported"], ["Yearly Wage Rise", field(player, "yearlyWageRise") ?? "Not exported"], ["Extension Option", field(player, "extensionOption") ?? "Not exported"], ["Sell-on Clause", field(player, "sellOnClause") ?? "Not exported"]]} /></div></section>;
+
+  if (tab === "Transfer Status") return <section className="fm-tab-panel transfer-tab"><h3>Interested Clubs</h3><div className="interest-head"><strong>Main Interest</strong><span>Offer Date</span></div><InfoGrid rows={[["Recent Offers", field(player, "recentOffers") ?? "None"], ["Major Interest From Clubs", field(player, "majorInterest") ?? "None"], ["Minor Interest From Clubs", field(player, "minorInterest") ?? "None"], ["Transfer Status", player.transferValueStatus === "not_for_sale" ? "Not for sale" : textValue(player.transferValueStatus)], ["FM Value", money(player)]]} /></section>;
+
+  if (tab === "Medical Report") return <section className="fm-tab-panel medical-tab"><div><h3>Match Load</h3><strong className="green">Light</strong><p>{fmt(player.minutes, 0)} exported minutes.</p><p>Detailed 14-day load is not exported in the uploaded HTML.</p></div><div><h3>Training Load</h3><strong className="green">{field(player, "trainingLoad") ?? "Not exported"}</strong><p>{field(player, "fatigue") ?? "Fatigue column not exported."}</p></div><div><h3>Injury Susceptibility</h3><strong className="yellow">{field(player, "injuryRisk") ?? "Not exported"}</strong><p>{field(player, "injury") ?? "No recurring injury column exported."}</p></div><div><h3>Fitness</h3><strong className="green">{field(player, "condition", "fitness") ?? "Not exported"}</strong><p>{field(player, "morale") ?? "Morale/condition detail not exported."}</p></div></section>;
+
+  return <section className="fm-tab-panel history-tab"><h3>Career Stats</h3><table className="fm-history-table"><thead><tr><th>Year</th><th>Team</th><th>Apps</th><th>Goals</th></tr></thead><tbody><tr><td>Current export</td><td><strong>{player.club ?? "-"}</strong><small>{player.nationality ?? ""}</small></td><td>{fmt(player.minutes ? Math.round(Number(player.minutes) / 90) : undefined, 0)}</td><td>{statValue(player, "goals90", 2)}</td></tr></tbody><tfoot><tr><td>Overall</td><td>Uploaded dataset</td><td>{fmt(player.minutes ? Math.round(Number(player.minutes) / 90) : undefined, 0)}</td><td>{statValue(player, "goals90", 2)}</td></tr></tfoot></table><p className="muted-tab-note">Season-by-season club history needs those history columns in the FM export.</p></section>;
+}
+function InfoGrid({ rows }: { rows: [string, unknown][] }) {
+  return <div className="fm-info-grid">{rows.map(([label, value]) => <div key={label}><span>{label}</span><strong>{textValue(value)}</strong></div>)}</div>;
+}
+function statRows(player: ScoredPlayer) {
+  if (isGoalkeeper(player)) return [
+    { label: "Goals conceded per 90", poor: "2.15", average: "1.41", good: "0.75", rating: statValue(player, "conceded90") },
+    { label: "Save Percentage", poor: "62%", average: "72%", good: "80%", rating: statValue(player, "savePercentage", 0, "%") },
+    { label: "Clean Sheets per 90", poor: "0.05", average: "0.20", good: "0.35", rating: statValue(player, "cleanSheets90") },
+    { label: "Pass Completion Percentage", poor: "47%", average: "78%", good: "97%", rating: statValue(player, "passCompletion", 0, "%") },
+  ];
+  return [
+    { label: "Goals per 90", poor: "0.10", average: "0.35", good: "0.75", rating: statValue(player, "goals90") },
+    { label: "Expected Goals per 90", poor: "0.10", average: "0.35", good: "0.65", rating: statValue(player, "xg90") },
+    { label: "Assists per 90", poor: "0.05", average: "0.20", good: "0.45", rating: statValue(player, "assists90") },
+    { label: "Pass Completion Percentage", poor: "68%", average: "82%", good: "90%", rating: statValue(player, "passCompletion", 0, "%") },
+  ];
 }
 function ScorePill({ label, value }: { label: string; value: number }) {
   return <div className="score-pill"><span>{label}</span><strong className={scoreClass(value)}>{fmt(value)}</strong></div>;
