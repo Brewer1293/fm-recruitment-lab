@@ -1,7 +1,9 @@
 import clubUidMap from "./generated/clubUidMap.json";
+import logoAssetMap from "./generated/logoAssetMap.json";
 import type { NormalizedPlayer } from "./types";
 
 const ASSET_BASE_URL = "https://assets.brewerlabs.uk";
+const logoPathsByUid = logoAssetMap as Record<string, string>;
 
 const countryCodeAliases: Record<string, string> = {
   eng: "eng", england: "eng",
@@ -159,15 +161,25 @@ export function resolveNationUid(value?: string) {
 }
 
 export function playerFaceUrl(player: Pick<NormalizedPlayer, "uid">) {
-  return player.uid ? `${ASSET_BASE_URL}/faces/players/${String(player.uid).replace(/,/g, "")}.png` : undefined;
+  const uid = player.uid ? String(player.uid).replace(/,/g, "") : "";
+  return uid ? `${ASSET_BASE_URL}/faces/faces/face_${uid}.png` : undefined;
 }
 
 export function clubLogoUrl(player: Pick<NormalizedPlayer, "club" | "basedIn" | "based" | "division">) {
   const uid = resolveClubUid(player);
-  return uid ? `${ASSET_BASE_URL}/logos/clubs/${uid}.png` : undefined;
+  return uid ? logoUrlFromUid(uid) : undefined;
 }
 
 export function nationLogoUrl(player: Pick<NormalizedPlayer, "nationality">) {
   const uid = resolveNationUid(player.nationality);
-  return uid ? `${ASSET_BASE_URL}/logos/nations/${uid}.png` : undefined;
+  return uid ? logoUrlFromUid(uid) : undefined;
+}
+
+function logoUrlFromUid(uid: string) {
+  const path = logoPathsByUid[String(uid)];
+  return path ? `${ASSET_BASE_URL}/${encodeAssetPath(path)}` : undefined;
+}
+
+function encodeAssetPath(path: string) {
+  return path.split("/").map((part) => encodeURIComponent(part)).join("/");
 }
