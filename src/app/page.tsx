@@ -13,7 +13,14 @@ type Tab = "tactic" | "rankings" | "import" | "validation" | "compare" | "instru
 type SortKey = "roleScore" | "recruitmentScore" | "confidenceScore" | "attribute" | "stats" | "hidden" | "position" | "value" | "age" | "minutes" | "apps" | "goals" | "assists" | "averageRating";
 type SuitabilityFilter = "role-position" | "conversion" | "all";
 type PositionFilter = "" | "GK" | "DL" | "DC" | "DR" | "WBL" | "WBR" | "DM" | "ML" | "MC" | "MR" | "AML" | "AMC" | "AMR" | "ST";
-const APP_VERSION = "v0.2.20-profile-rank-navigation";
+type ThemeChoice = "orange" | "blue" | "emerald";
+const APP_VERSION = "v0.2.21-theme-picker";
+const THEME_STORAGE_KEY = "fm-recruitment-lab-theme";
+const THEME_OPTIONS: { value: ThemeChoice; label: string; description: string }[] = [
+  { value: "orange", label: "Classic Orange", description: "The current FM Lab orange accent." },
+  { value: "blue", label: "Cool Blue", description: "A colder analyst-style blue accent." },
+  { value: "emerald", label: "Emerald Green", description: "A sharper green accent with the same dark skin." },
+];
 const fmt = (value?: number, dp = 1) => value === undefined ? "-" : value.toFixed(dp);
 const scoreClass = (value?: number) => value === undefined ? "" : value >= 80 ? "elite" : value >= 65 ? "good" : value >= 50 ? "okay" : "low";
 const compactMoney = (value?: number) => {
@@ -152,6 +159,7 @@ export default function Home() {
   const [report, setReport] = useState<ValidationReport | null>(null), [error, setError] = useState("");
   const [progress, setProgress] = useState({ message: "", percent: 0 }), [busy, setBusy] = useState(false);
   const [roleId, setRoleId] = useState<RoleId>("af-at"), [slot, setSlot] = useState<SlotId>("ST");
+  const [theme, setTheme] = useState<ThemeChoice>("orange");
   const [selected, setSelected] = useState<ScoredPlayer | null>(null), [compareIds, setCompareIds] = useState<string[]>([]);
   const [search, setSearch] = useState(""), [minMinutes, setMinMinutes] = useState(0), [maxAge, setMaxAge] = useState(50);
   const [minAge, setMinAge] = useState(0), [club, setClub] = useState(""), [nation, setNation] = useState(""), [positionFilter, setPositionFilter] = useState<PositionFilter>(""), [foot, setFoot] = useState("");
@@ -190,6 +198,14 @@ export default function Home() {
     defaultLoadStarted.current = true;
     void loadDefaultPlayers(false);
   }, [players.length]);
+  useEffect(() => {
+    const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+    if (stored === "orange" || stored === "blue" || stored === "emerald") setTheme(stored);
+  }, []);
+  useEffect(() => {
+    document.body.dataset.theme = theme;
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+  }, [theme]);
 
   async function handleFiles(files: File[]) {
     setBusy(true); setError(""); setProgress({ message: "Preparing upload", percent: 0 });
@@ -242,7 +258,7 @@ export default function Home() {
       <RankTable players={rankings.slice(0, 500)} total={rankings.length} scores={rankingScores} compareIds={compareIds} sort={sort} onOpen={setSelected} onCompare={toggleCompare} /></section>}
     {tab === "compare" && <Comparison players={compared} roleId={roleId} onExport={() => exportCSV("fm-recruitment-comparison.csv", compared)} />}
     {tab === "instructions" && <Instructions />}
-    {tab === "settings" && <Settings report={report} onTactic={() => setTab("tactic")} onExport={() => exportCSV("fm-recruitment-full-scored-dataset.csv", players)} />}
+    {tab === "settings" && <Settings report={report} theme={theme} onThemeChange={setTheme} onTactic={() => setTab("tactic")} onExport={() => exportCSV("fm-recruitment-full-scored-dataset.csv", players)} />}
     {selected && <PlayerModal player={selected} slot={slot} roleId={roleId} benchmarks={stagBenchmarks} rankIndex={selectedRankIndex} rankTotal={rankings.length} onPrevious={selectedRankIndex > 0 ? () => selectAdjacentPlayer(-1) : undefined} onNext={selectedRankIndex >= 0 && selectedRankIndex < rankings.length - 1 ? () => selectAdjacentPlayer(1) : undefined} onClose={() => setSelected(null)} />}
     <div className="app-version">{APP_VERSION}</div>
   </main>;
@@ -289,8 +305,10 @@ function Comparison({ players, roleId, onExport }: { players: ScoredPlayer[]; ro
       <div className="compare-section"><h3>Role flexibility</h3><div className="table-scroll"><table className="compare-role-table"><thead><tr><th>Role</th>{players.map((player) => <th key={player.id}>{player.name}</th>)}</tr></thead><tbody>{roles.map((role) => <tr key={role}><td>{roleDisplayName(ROLE_CONFIG[role])}</td>{players.map((player) => { const value = player.scores[role].roleScore; return <td key={player.id} className={scoreClass(value)}><span className="role-chip-score">{fmt(value)}</span></td>; })}</tr>)}</tbody></table></div></div>
     </>}</section>;
 }
-function Settings({ report, onTactic, onExport }: { report: ValidationReport | null; onTactic: () => void; onExport: () => void }) {
-  return <section className="panel settings"><span className="eyebrow">Scoring transparency</span><h2>{PRESET_VERSION}</h2><p>Role Score is pure role fit: 70% attributes, 15% position/foot, 10% hidden/profile and 5% shrunken stats. Recruitment Score adds market value, wage and age/development.</p><button onClick={onExport}>Export full scored dataset CSV</button>{report && <details open><summary><strong>Data validation report</strong></summary><ValidationSummary report={report} onTactic={onTactic} /></details>}{Object.values(ROLE_CONFIG).map((role) => <details key={role.id}><summary><strong>{roleDisplayName(role)}</strong></summary><p><b>Attribute weights:</b> {Object.entries(role.attributeWeights).map(([key, weight]) => `${key} ${weight}`).join(", ")}</p><p><b>Positive stats:</b> {Object.entries(role.positiveStatWeights).map(([key, weight]) => `${key} ${weight}`).join(", ")}</p><p><b>Floor penalties:</b> {role.floorPenalties.map((p) => `${p.attribute}<${p.lt}: -${p.minus}`).join(", ") || "None"}</p></details>)}</section>;
+function Settings({ report, theme, onThemeChange, onTactic, onExport }: { report: ValidationReport | null; theme: ThemeChoice; onThemeChange: (theme: ThemeChoice) => void; onTactic: () => void; onExport: () => void }) {
+  return <section className="panel settings"><span className="eyebrow">Scoring transparency</span><h2>{PRESET_VERSION}</h2><p>Role Score is pure role fit: 70% attributes, 15% position/foot, 10% hidden/profile and 5% shrunken stats. Recruitment Score adds market value, wage and age/development.</p>
+    <section className="settings-block"><div><h3>Theme</h3><p>Choose the accent colour used across tabs, highlights, buttons and score details.</p></div><div className="theme-picker">{THEME_OPTIONS.map((option) => <button key={option.value} type="button" className={theme === option.value ? `theme-option ${option.value} active` : `theme-option ${option.value}`} onClick={() => onThemeChange(option.value)}><span /><strong>{option.label}</strong><small>{option.description}</small></button>)}</div></section>
+    <button onClick={onExport}>Export full scored dataset CSV</button>{report && <details open><summary><strong>Data validation report</strong></summary><ValidationSummary report={report} onTactic={onTactic} /></details>}{Object.values(ROLE_CONFIG).map((role) => <details key={role.id}><summary><strong>{roleDisplayName(role)}</strong></summary><p><b>Attribute weights:</b> {Object.entries(role.attributeWeights).map(([key, weight]) => `${key} ${weight}`).join(", ")}</p><p><b>Positive stats:</b> {Object.entries(role.positiveStatWeights).map(([key, weight]) => `${key} ${weight}`).join(", ")}</p><p><b>Floor penalties:</b> {role.floorPenalties.map((p) => `${p.attribute}<${p.lt}: -${p.minus}`).join(", ") || "None"}</p></details>)}</section>;
 }
 function Instructions() {
   const exportColumns = ["Name", "Age", "DOB", "UID", "Club", "Nation", "Position", "Preferred Foot", "Left Foot", "Right Foot", "Height", "Transfer Value", "Wage", "Minutes", "Av Rat", "all visible attributes", "relevant per-90 stats"];
