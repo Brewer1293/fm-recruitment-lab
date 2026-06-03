@@ -15,6 +15,7 @@ export type NormalizedPlayer = Record<string, string | number | RawPlayer | unde
   preferredFoot?: string;
   leftFoot?: string;
   rightFoot?: string;
+  height?: string;
   valueM?: number;
   valueLowM?: number;
   valueHighM?: number;

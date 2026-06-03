@@ -14,7 +14,33 @@ type SuitabilityFilter = "role-position" | "conversion" | "all";
 type PositionFilter = "" | "GK" | "DL" | "DC" | "DR" | "WBL" | "WBR" | "DM" | "ML" | "MC" | "MR" | "AML" | "AMC" | "AMR" | "ST";
 const fmt = (value?: number, dp = 1) => value === undefined ? "-" : value.toFixed(dp);
 const scoreClass = (value?: number) => value === undefined ? "" : value >= 80 ? "elite" : value >= 65 ? "good" : value >= 50 ? "okay" : "low";
-const money = (player: ScoredPlayer) => player.transferValueStatus === "not_for_sale" ? "Not for sale" : player.valueM === undefined ? "-" : `£${fmt(player.valueM)}m`;
+const compactMoney = (value?: number) => {
+  if (value === undefined || Number.isNaN(value)) return "-";
+  const sign = value < 0 ? "-" : "";
+  const abs = Math.abs(value);
+  if (abs < 1) return `${sign}£${Math.round(abs * 1000)}k`;
+  const shown = Number.isInteger(abs) ? String(abs) : abs.toFixed(1).replace(/\.0$/, "");
+  return `${sign}£${shown}M`;
+};
+const compactWage = (value?: number) => {
+  if (value === undefined || Number.isNaN(value)) return "-";
+  if (Math.abs(value) < 1) return `£${Math.round(value * 1000)}`;
+  const shown = Number.isInteger(value) ? String(value) : value.toFixed(1).replace(/\.0$/, "");
+  return `£${shown}k`;
+};
+const height = (value?: string | number) => {
+  if (value === undefined || value === "") return "-";
+  const raw = String(value).trim();
+  const imperial = raw.match(/(\d+)\s*(?:'|ft|feet)\s*(\d+)?/i);
+  if (imperial) return `${Number(imperial[1])}'${Number(imperial[2] ?? 0)}"`;
+  const metric = raw.match(/(\d+(?:\.\d+)?)\s*(cm|m)?/i);
+  if (!metric) return raw;
+  const n = Number(metric[1]), cm = metric[2]?.toLowerCase() === "m" ? n * 100 : n;
+  if (!Number.isFinite(cm) || cm < 100 || cm > 230) return raw;
+  const inches = Math.round(cm / 2.54);
+  return `${Math.floor(inches / 12)}'${inches % 12}"`;
+};
+const money = (player: ScoredPlayer) => player.transferValueStatus === "not_for_sale" ? "Not for sale" : compactMoney(player.valueM);
 const POSITION_OPTIONS: { value: PositionFilter; label: string }[] = [
   { value: "", label: "All positions" }, { value: "GK", label: "GK" }, { value: "DL", label: "LB / D (L)" }, { value: "DC", label: "CB / D (C)" }, { value: "DR", label: "RB / D (R)" },
   { value: "WBL", label: "LWB / WB (L)" }, { value: "WBR", label: "RWB / WB (R)" }, { value: "DM", label: "DM" }, { value: "ML", label: "LM / M (L)" }, { value: "MC", label: "CM / M (C)" }, { value: "MR", label: "RM / M (R)" },
@@ -24,7 +50,11 @@ const ATTRIBUTE_GROUPS = [
   { label: "Technical", keys: [["Fir", "fir"], ["Fin", "fin"], ["Pas", "pas"], ["Tec", "tec"], ["Dri", "dri"], ["Cro", "cro"], ["Hea", "hea"], ["Tck", "tck"], ["Lon", "lon"]] },
   { label: "Mental", keys: [["OtB", "otb"], ["Tea", "tea"], ["Vis", "vis"], ["Dec", "dec"], ["Ant", "ant"], ["Cmp", "cmp"], ["Cnt", "cnt"], ["Pos", "pos"], ["Fla", "fla"], ["Bra", "bra"], ["Det", "det"], ["Wor", "wor"]] },
   { label: "Physical", keys: [["Acc", "acc"], ["Pac", "pac"], ["Sta", "sta"], ["Str", "str"], ["Agi", "agi"], ["Bal", "bal"], ["Jum", "jum"], ["Nat", "nat"]] },
-  { label: "Goalkeeping", keys: [["Ref", "ref"], ["1v1", "oneVOne"], ["Cmd", "cmd"], ["Kic", "kic"], ["Thr", "thr"], ["Han", "han"], ["Aer", "aer"]] },
+] as const;
+const GOALKEEPER_ATTRIBUTE_GROUPS = [
+  { label: "Goalkeeping", keys: [["Ref", "ref"], ["1v1", "oneVOne"], ["Cmd", "cmd"], ["Kic", "kic"], ["Thr", "thr"], ["Han", "han"], ["Aer", "aer"], ["Com", "com"], ["Ecc", "ecc"], ["Pun", "pun"], ["TRO", "tro"]] },
+  { label: "Mental", keys: [["OtB", "otb"], ["Tea", "tea"], ["Vis", "vis"], ["Dec", "dec"], ["Ant", "ant"], ["Cmp", "cmp"], ["Cnt", "cnt"], ["Pos", "pos"], ["Fla", "fla"], ["Bra", "bra"], ["Det", "det"], ["Wor", "wor"]] },
+  { label: "Physical", keys: [["Acc", "acc"], ["Pac", "pac"], ["Sta", "sta"], ["Str", "str"], ["Agi", "agi"], ["Bal", "bal"], ["Jum", "jum"], ["Nat", "nat"]] },
 ] as const;
 const modalTabs = ["Attributes", "Information", "FM Stag Stats", "Contract Info", "Transfer Status", "Medical Report", "History"];
 const attrTone = (value?: number) => value === undefined ? "missing" : value >= 16 ? "elite" : value >= 13 ? "good" : value >= 10 ? "okay" : "low";
@@ -32,8 +62,9 @@ const ATTRIBUTE_LABELS: Record<string, string> = {
   Fir: "First Touch", Fin: "Finishing", Pas: "Passing", Tec: "Technique", Dri: "Dribbling", Cro: "Crossing", Hea: "Heading", Tck: "Tackling", Lon: "Long Shots",
   OtB: "Off The Ball", Tea: "Teamwork", Vis: "Vision", Dec: "Decisions", Ant: "Anticipation", Cmp: "Composure", Cnt: "Concentration", Pos: "Positioning", Fla: "Flair", Bra: "Bravery", Det: "Determination", Wor: "Work Rate",
   Acc: "Acceleration", Pac: "Pace", Sta: "Stamina", Str: "Strength", Agi: "Agility", Bal: "Balance", Jum: "Jumping Reach", Nat: "Natural Fitness",
-  Ref: "Reflexes", "1v1": "One On Ones", Cmd: "Command Of Area", Kic: "Kicking", Thr: "Throwing", Han: "Handling", Aer: "Aerial Reach",
+  Ref: "Reflexes", "1v1": "One On Ones", Cmd: "Command Of Area", Kic: "Kicking", Thr: "Throwing", Han: "Handling", Aer: "Aerial Reach", Com: "Communication", Ecc: "Eccentricity", Pun: "Punching", TRO: "Rushing Out",
 };
+const isGoalkeeper = (player: ScoredPlayer) => positionCodes(player.position).has("GK");
 const POSITION_CODE_CACHE = new Map<string, Set<string>>();
 function positionCodes(position?: string) {
   const text = String(position ?? "").toUpperCase().replace(/\s+/g, "");
@@ -141,7 +172,7 @@ function Tactic({ onSelect }: { onSelect: (slot: SlotId, role: RoleId) => void }
 }
 function RankTable({ players, total, scores, compareIds, sort, onOpen, onCompare }: { players: ScoredPlayer[]; total: number; scores: Map<string, RoleScore>; compareIds: string[]; sort: (key: SortKey) => void; onOpen: (player: ScoredPlayer) => void; onCompare: (id: string) => void }) {
   const heads: [SortKey | "name" | "club" | "position" | "valueM" | "wageK", string][] = [["name", "Player"], ["age", "Age"], ["club", "Club"], ["position", "Position"], ["valueM", "FM Value"], ["wageK", "Wage"], ["roleScore", "Role Score"], ["recruitmentScore", "Recruitment"], ["confidenceScore", "Confidence"], ["attribute", "Attribute"], ["stats", "Adj Stats"], ["hidden", "Hidden/Profile"], ["position", "Position Score"], ["value", "Value Score"], ["minutes", "Mins"], ["averageRating", "Av Rat"]];
-  return <section className="panel table-panel"><div className="panel-head"><strong>{total.toLocaleString()} ranked matches</strong><span>{total > players.length ? `Showing first ${players.length.toLocaleString()} results` : "Showing all results"}</span></div>{!players.length ? <div className="empty-state">No players match the current filters.</div> : <div className="table-scroll"><table><thead><tr><th>#</th><th>Compare</th>{heads.map(([key, label]) => <th key={key} onClick={() => sort(key as SortKey)}>{label}</th>)}<th>Caps</th><th>Warnings</th></tr></thead><tbody>{players.map((player, index) => { const score = scores.get(player.id)!; return <tr key={player.id} onClick={() => onOpen(player)}><td>{index + 1}</td><td><button className={compareIds.includes(player.id) ? "compare active" : "compare"} onClick={(e) => { e.stopPropagation(); onCompare(player.id); }}>+</button></td><td><strong>{player.name}</strong><small>{player.nationality}</small></td><td>{fmt(player.age, 0)}</td><td>{player.club}</td><td>{player.position}</td><td>{money(player)}</td><td>£{fmt(player.wageK)}k</td><td className={scoreClass(score.roleScore)}>{fmt(score.roleScore)}</td><td>{fmt(score.recruitmentScore)}</td><td>{fmt(score.confidenceScore)}</td><td>{fmt(score.attribute.score)}</td><td>{fmt(score.stats.score)}</td><td>{fmt(score.hidden.score)}</td><td>{fmt(score.position.score)}</td><td>{fmt(score.value.score)}</td><td>{fmt(player.minutes, 0)}</td><td>{fmt(player.averageRating, 2)}</td><td>{score.caps.join(", ") || "-"}</td><td>{score.warnings[0] ?? "-"}</td></tr>; })}</tbody></table></div>}</section>;
+  return <section className="panel table-panel"><div className="panel-head"><strong>{total.toLocaleString()} ranked matches</strong><span>{total > players.length ? `Showing first ${players.length.toLocaleString()} results` : "Showing all results"}</span></div>{!players.length ? <div className="empty-state">No players match the current filters.</div> : <div className="table-scroll"><table><thead><tr><th>#</th><th>Compare</th>{heads.map(([key, label]) => <th key={key} onClick={() => sort(key as SortKey)}>{label}</th>)}<th>Caps</th><th>Warnings</th></tr></thead><tbody>{players.map((player, index) => { const score = scores.get(player.id)!; return <tr key={player.id} onClick={() => onOpen(player)}><td>{index + 1}</td><td><button className={compareIds.includes(player.id) ? "compare active" : "compare"} onClick={(e) => { e.stopPropagation(); onCompare(player.id); }}>+</button></td><td><strong>{player.name}</strong><small>{player.nationality}</small></td><td>{fmt(player.age, 0)}</td><td>{player.club}</td><td>{player.position}</td><td>{money(player)}</td><td>{compactWage(player.wageK)}</td><td className={scoreClass(score.roleScore)}>{fmt(score.roleScore)}</td><td>{fmt(score.recruitmentScore)}</td><td>{fmt(score.confidenceScore)}</td><td>{fmt(score.attribute.score)}</td><td>{fmt(score.stats.score)}</td><td>{fmt(score.hidden.score)}</td><td>{fmt(score.position.score)}</td><td>{fmt(score.value.score)}</td><td>{fmt(player.minutes, 0)}</td><td>{fmt(player.averageRating, 2)}</td><td>{score.caps.join(", ") || "-"}</td><td>{score.warnings[0] ?? "-"}</td></tr>; })}</tbody></table></div>}</section>;
 }
 function Comparison({ players, onExport }: { players: ScoredPlayer[]; onExport: () => void }) {
   const roles = Object.keys(ROLE_CONFIG) as RoleId[];
@@ -164,12 +195,12 @@ function PlayerModal({ player, roleId, slot, onClose }: { player: ScoredPlayer; 
         <div className="profile-status-chip">Int</div>
         <div className="profile-name-strip"><strong>{player.name}</strong><span>Role {fmt(active.roleScore)} · Recruitment {fmt(active.recruitmentScore)} · Confidence {fmt(active.confidenceScore)}</span></div>
       </div>
-      <div className="fm-info-card"><ProfileLine label="Nationality" value={player.nationality ?? "-"} splitLabel="Nation UID" splitValue={nationUid ?? "-"} /><ProfileLine label="Position" value={player.position ?? "-"} /><ProfileLine label="Age" value={player.age ?? "-"} splitLabel="Club UID" splitValue={clubUid ?? "-"} /><ProfileLine label="Wage" value={`£${fmt(player.wageK)}k/w`} splitLabel="Value" splitValue={money(player)} /><ProfileLine label="Role" value={`${slot} · ${role.shortName}`} splitLabel="Best role" splitValue={`${bestRole.role.shortName} ${fmt(bestRole.score)}`} /><ProfileLine label="Minutes" value={fmt(player.minutes)} splitLabel="Status" splitValue={active.warnings.length ? `${active.warnings.length} warning${active.warnings.length === 1 ? "" : "s"}` : "Clear"} /></div>
+      <div className="fm-info-card"><ProfileLine label="Nationality" value={player.nationality ?? "-"} splitLabel="Nation UID" splitValue={nationUid ?? "-"} /><ProfileLine label="Position" value={player.position ?? "-"} /><ProfileLine label="Age" value={player.age ?? "-"} splitLabel="Height" splitValue={height(player.height)} /><ProfileLine label="Wage" value={compactWage(player.wageK)} splitLabel="Value" splitValue={money(player)} /><ProfileLine label="Role" value={`${slot} · ${role.shortName}`} splitLabel="Best role" splitValue={`${bestRole.role.shortName} ${fmt(bestRole.score)}`} /><ProfileLine label="Minutes" value={fmt(player.minutes, 0)} splitLabel="Club UID" splitValue={clubUid ?? "-"} /></div>
     </section>
     <div className="fm-tabs">{modalTabs.map((label, index) => <span className={index === 0 ? "active" : ""} key={label}>{label}</span>)}</div>
     <section className="fm-profile-body">
       <div className="fm-position-panel"><h3>Positions</h3><div className="skin-pitch"><span className="pitch-dot dot-st" /><span className="pitch-dot dot-lw" /><span className="pitch-dot dot-rw" /><span className="pitch-dot dot-cm" /></div><h3>Role and duty</h3><div className="fm-role-card"><strong>{role.shortName}</strong><span>{role.label}</span><b className={scoreClass(active.roleScore)}>{fmt(active.roleScore)}</b></div><div className="fm-role-list">{Object.values(ROLE_CONFIG).map((candidate) => <div className="role-bar" key={candidate.id}><span>{candidate.shortName}</span><i><b className={scoreClass(player.scores[candidate.id].roleScore)} style={{ width: `${player.scores[candidate.id].roleScore}%` }} /></i><strong className={scoreClass(player.scores[candidate.id].roleScore)}>{fmt(player.scores[candidate.id].roleScore)}</strong></div>)}</div></div>
-      <section className="attribute-panel fm-attributes"><div className="attribute-groups">{ATTRIBUTE_GROUPS.map((group) => {
+      <section className="attribute-panel fm-attributes"><div className="attribute-groups">{(isGoalkeeper(player) ? GOALKEEPER_ATTRIBUTE_GROUPS : ATTRIBUTE_GROUPS).map((group) => {
         const visible = group.keys.filter(([, key]) => player[key] !== undefined);
         if (!visible.length) return null;
         return <div className="attribute-group" key={group.label}><h4>{group.label}</h4>{visible.map(([label, key]) => {
