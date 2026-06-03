@@ -76,7 +76,9 @@ const field = (player: ScoredPlayer, ...keys: string[]) => {
 };
 const dobLine = (player: ScoredPlayer) => {
   const dob = field(player, "dob", "dateOfBirth");
-  return dob ? `${dob}${player.age !== undefined ? ` (${fmt(player.age, 0)} years old)` : ""}` : player.age !== undefined ? `${fmt(player.age, 0)} years old` : "-";
+  if (!dob) return player.age !== undefined ? `${fmt(player.age, 0)} years old` : "-";
+  if (/\(\s*\d+\s*years?\s*old\s*\)/i.test(String(dob))) return String(dob);
+  return `${dob}${player.age !== undefined ? ` (${fmt(player.age, 0)} years old)` : ""}`;
 };
 const capsLine = (player: ScoredPlayer) => {
   const caps = field(player, "internationalCaps", "caps");
@@ -270,15 +272,14 @@ function ScorePill({ label, value }: { label: string; value: number }) {
 }
 function TopInfoCard({ player }: { player: ScoredPlayer }) {
   const nationUrl = nationLogoUrl(player), caps = capsLine(player);
-  const condition = field(player, "condition", "fitness"), sharpness = field(player, "sharpness", "matchSharpness");
   const morale = field(player, "morale");
   return <div className="fm-info-card top-info-card">
     <div className="top-info-row full nationality-row"><span>Nationality</span><strong><span className="top-main-value">{player.nationality ?? "-"}<span className="mini-flag"><AssetImage src={nationUrl} alt={`${player.nationality ?? "Nation"} flag`} fallback="" /></span></span>{caps && <small>{caps}</small>}</strong></div>
     <div className="top-info-row full"><span>D.O.B.</span><strong>{dobLine(player)}</strong></div>
     <div className="top-info-row split"><span>Wage</span><strong>{compactWage(player.wageK)}</strong><span>Value</span><strong>{money(player)}</strong></div>
-    <div className="top-info-row split"><span>Ability</span><strong>Unknown</strong><span>Potential</span><strong>Unknown</strong></div>
+    <div className="top-info-row split"><span>Height</span><strong>{height(player.height)}</strong><span>Left Foot</span><strong>{field(player, "leftFoot") ?? "-"}</strong></div>
     <div className="top-info-row split"><span>Morale</span><strong className="icon-value">{morale ?? "▲"}</strong><span>Av Rat</span><strong className="green">{fmt(player.averageRating, 2)}</strong></div>
-    <div className="top-info-row split"><span>Condition</span><strong className="icon-value">{condition ?? "♡"}</strong><span>Sharpness</span><strong className="icon-value">{sharpness ?? "◔"}</strong></div>
+    <div className="top-info-row split"><span>Right Foot</span><strong>{field(player, "rightFoot") ?? "-"}</strong><span>Preferred Foot</span><strong>{field(player, "preferredFoot") ?? "-"}</strong></div>
   </div>;
 }
 function Breakdown({ score }: { score: RoleScore }) { const parts: [string, RoleScore[keyof Pick<RoleScore, "attribute" | "stats" | "hidden" | "position" | "value">]][] = [["Attributes", score.attribute], ["Adjusted Stats", score.stats], ["Hidden/Profile", score.hidden], ["Position/Foot", score.position], ["Value", score.value]]; return <div className="breakdown">{parts.map(([label, item]) => <div key={label}><span>{label}</span><strong>{fmt(item.score)}</strong><small>{item.available}/{item.expected} inputs</small></div>)}</div>; }
