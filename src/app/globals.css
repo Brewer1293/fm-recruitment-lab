@@ -1210,7 +1210,7 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   display: flex;
   gap: 0;
   margin-bottom: 0;
-  overflow: auto;
+  overflow: hidden;
 }
 .fm-tabs button {
   appearance: none;
@@ -1223,7 +1223,7 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
   border-bottom: 0;
   color: rgba(244,244,244,.6);
   cursor: pointer;
-  flex: 0 0 auto;
+  flex: 1 1 0;
   font-size: 15px;
   line-height: 1;
   min-height: 37px;
@@ -1678,6 +1678,8 @@ code { color: var(--orange-2); }
   .profile-grid.compact, .attribute-groups { grid-template-columns: 1fr; }
   .fm-profile-top, .fm-profile-body, .fm-bottom-panels, .info-tab, .contract-tab, .medical-tab { grid-template-columns: 1fr; }
   .fm-role-list { max-height: 178px; overflow: auto; padding-right: 4px; }
+  .fm-tabs { overflow: auto; }
+  .fm-tabs button { flex: 0 0 auto; }
   .fm-role-tabs { overflow: auto; }
   .tactic-stag-tabs button { flex-basis: 58px; }
   .fm-player-card { grid-template-columns: 120px 1fr; min-height: 260px; }
