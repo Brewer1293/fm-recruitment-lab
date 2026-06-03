@@ -1446,7 +1446,7 @@ tbody tr:hover { background: rgba(255,165,40,.18); cursor: pointer; }
 .stag-summary {
   display: grid;
   gap: 8px;
-  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  grid-template-columns: repeat(5, minmax(110px, 1fr));
   margin: 10px 0 14px;
 }
 .score-pill {
