@@ -47,21 +47,21 @@ const POSITION_OPTIONS: { value: PositionFilter; label: string }[] = [
   { value: "AML", label: "LW / AM (L)" }, { value: "AMC", label: "AM / AM (C)" }, { value: "AMR", label: "RW / AM (R)" }, { value: "ST", label: "ST" },
 ];
 const ATTRIBUTE_GROUPS = [
-  { label: "Technical", keys: [["Fir", "fir"], ["Fin", "fin"], ["Pas", "pas"], ["Tec", "tec"], ["Dri", "dri"], ["Cro", "cro"], ["Hea", "hea"], ["Tck", "tck"], ["Lon", "lon"]] },
-  { label: "Mental", keys: [["OtB", "otb"], ["Tea", "tea"], ["Vis", "vis"], ["Dec", "dec"], ["Ant", "ant"], ["Cmp", "cmp"], ["Cnt", "cnt"], ["Pos", "pos"], ["Fla", "fla"], ["Bra", "bra"], ["Det", "det"], ["Wor", "wor"]] },
-  { label: "Physical", keys: [["Acc", "acc"], ["Pac", "pac"], ["Sta", "sta"], ["Str", "str"], ["Agi", "agi"], ["Bal", "bal"], ["Jum", "jum"], ["Nat", "nat"]] },
+  { label: "Technical", keys: [["Cor", "cor"], ["Cro", "cro"], ["Dri", "dri"], ["Fin", "fin"], ["Fir", "fir"], ["Fre", "fre"], ["Hea", "hea"], ["Lon", "lon"], ["L Th", "lth"], ["Mar", "mar"], ["Pas", "pas"], ["Pen", "pen"], ["Tck", "tck"], ["Tec", "tec"]] },
+  { label: "Mental", keys: [["Agg", "agg"], ["Ant", "ant"], ["Bra", "bra"], ["Cmp", "cmp"], ["Cnt", "cnt"], ["Vis", "vis"], ["Dec", "dec"], ["Det", "det"], ["Fla", "fla"], ["Ldr", "ldr"], ["OtB", "otb"], ["Pos", "pos"], ["Tea", "tea"], ["Wor", "wor"]] },
+  { label: "Physical", keys: [["Acc", "acc"], ["Agi", "agi"], ["Bal", "bal"], ["Jum", "jum"], ["Nat", "nat"], ["Pac", "pac"], ["Sta", "sta"], ["Str", "str"]] },
 ] as const;
 const GOALKEEPER_ATTRIBUTE_GROUPS = [
-  { label: "Goalkeeping", keys: [["Ref", "ref"], ["1v1", "oneVOne"], ["Cmd", "cmd"], ["Kic", "kic"], ["Thr", "thr"], ["Han", "han"], ["Aer", "aer"], ["Com", "com"], ["Ecc", "ecc"], ["Pun", "pun"], ["TRO", "tro"]] },
-  { label: "Mental", keys: [["OtB", "otb"], ["Tea", "tea"], ["Vis", "vis"], ["Dec", "dec"], ["Ant", "ant"], ["Cmp", "cmp"], ["Cnt", "cnt"], ["Pos", "pos"], ["Fla", "fla"], ["Bra", "bra"], ["Det", "det"], ["Wor", "wor"]] },
-  { label: "Physical", keys: [["Acc", "acc"], ["Pac", "pac"], ["Sta", "sta"], ["Str", "str"], ["Agi", "agi"], ["Bal", "bal"], ["Jum", "jum"], ["Nat", "nat"]] },
+  { label: "Goalkeeping", keys: [["Aer", "aer"], ["Cmd", "cmd"], ["Com", "com"], ["Ecc", "ecc"], ["Han", "han"], ["Kic", "kic"], ["1v1", "oneVOne"], ["Pun", "pun"], ["Ref", "ref"], ["TRO", "tro"], ["Thr", "thr"]] },
+  { label: "Mental", keys: [["Agg", "agg"], ["Ant", "ant"], ["Bra", "bra"], ["Cmp", "cmp"], ["Cnt", "cnt"], ["Vis", "vis"], ["Dec", "dec"], ["Det", "det"], ["Fla", "fla"], ["Ldr", "ldr"], ["OtB", "otb"], ["Pos", "pos"], ["Tea", "tea"], ["Wor", "wor"]] },
+  { label: "Physical", keys: [["Acc", "acc"], ["Agi", "agi"], ["Bal", "bal"], ["Jum", "jum"], ["Nat", "nat"], ["Pac", "pac"], ["Sta", "sta"], ["Str", "str"]] },
 ] as const;
 const modalTabs = ["Attributes", "Information", "FM Stag Stats", "Contract Info", "Transfer Status", "Medical Report", "History"] as const;
 type ModalTab = typeof modalTabs[number];
 const attrTone = (value?: number) => value === undefined ? "missing" : value >= 16 ? "elite" : value >= 13 ? "good" : value >= 10 ? "okay" : "low";
 const ATTRIBUTE_LABELS: Record<string, string> = {
-  Fir: "First Touch", Fin: "Finishing", Pas: "Passing", Tec: "Technique", Dri: "Dribbling", Cro: "Crossing", Hea: "Heading", Tck: "Tackling", Lon: "Long Shots",
-  OtB: "Off The Ball", Tea: "Teamwork", Vis: "Vision", Dec: "Decisions", Ant: "Anticipation", Cmp: "Composure", Cnt: "Concentration", Pos: "Positioning", Fla: "Flair", Bra: "Bravery", Det: "Determination", Wor: "Work Rate",
+  Cor: "Corners", Cro: "Crossing", Dri: "Dribbling", Fin: "Finishing", Fir: "First Touch", Fre: "Free Kick Taking", Hea: "Heading", Lon: "Long Shots", "L Th": "Long Throws", Mar: "Marking", Pas: "Passing", Pen: "Penalty Taking", Tck: "Tackling", Tec: "Technique",
+  Agg: "Aggression", Ant: "Anticipation", Bra: "Bravery", Cmp: "Composure", Cnt: "Concentration", Vis: "Vision", Dec: "Decisions", Det: "Determination", Fla: "Flair", Ldr: "Leadership", OtB: "Off The Ball", Pos: "Positioning", Tea: "Teamwork", Wor: "Work Rate",
   Acc: "Acceleration", Pac: "Pace", Sta: "Stamina", Str: "Strength", Agi: "Agility", Bal: "Balance", Jum: "Jumping Reach", Nat: "Natural Fitness",
   Ref: "Reflexes", "1v1": "One On Ones", Cmd: "Command Of Area", Kic: "Kicking", Thr: "Throwing", Han: "Handling", Aer: "Aerial Reach", Com: "Communication", Ecc: "Eccentricity", Pun: "Punching", TRO: "Rushing Out",
 };
