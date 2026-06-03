@@ -282,4 +282,15 @@ function TopInfoCard({ player }: { player: ScoredPlayer }) {
     <div className="top-info-row split"><span>Left Foot</span><strong>{field(player, "leftFoot") ?? "-"}</strong><span>Right Foot</span><strong>{field(player, "rightFoot") ?? "-"}</strong></div>
   </div>;
 }
-function Breakdown({ score }: { score: RoleScore }) { const parts: [string, RoleScore[keyof Pick<RoleScore, "attribute" | "stats" | "hidden" | "position" | "value">]][] = [["Attributes", score.attribute], ["Adjusted Stats", score.stats], ["Hidden/Profile", score.hidden], ["Position/Foot", score.position], ["Value", score.value]]; return <div className="breakdown">{parts.map(([label, item]) => <div key={label}><span>{label}</span><strong>{fmt(item.score)}</strong><small>{item.available}/{item.expected} inputs</small></div>)}</div>; }
+function Breakdown({ score }: { score: RoleScore }) {
+  const parts: [string, RoleScore[keyof Pick<RoleScore, "attribute" | "stats" | "hidden" | "position" | "value">], string][] = [
+    ["Attributes", score.attribute, "Raw FM attributes normalised to 0-100 using this role's direct 0-10 weights. This is the main role-fit driver."],
+    ["Adjusted Stats", score.stats, `Performance output after minutes shrinkage. Raw stats are ${fmt(score.rawStats)} before low-sample adjustment, so tiny samples are pulled back towards 50.`],
+    ["Hidden/Profile", score.hidden, "Consistency, professionalism, important matches and similar profile data where exported. Missing hidden data is treated neutrally and lowers confidence."],
+    ["Position/Foot", score.position, "Position familiarity plus the role's footedness rules. Natural role positions score highest; conversions and wrong-sided feet are capped or reduced."],
+    ["Value", score.value, "Market value and wage efficiency context for recruitment. This does not inflate pure Role Score; it matters more in signing/value decisions."],
+  ];
+  const [selected, setSelected] = useState(parts[0][0]);
+  const active = parts.find(([label]) => label === selected) ?? parts[0];
+  return <div className="breakdown-wrap"><div className="breakdown">{parts.map(([label, item]) => <button type="button" className={selected === label ? "breakdown-card active" : "breakdown-card"} key={label} onClick={() => setSelected(label)}><span>{label}</span><strong>{fmt(item.score)}</strong><small>{item.available}/{item.expected} inputs</small></button>)}</div><div className="breakdown-explainer"><strong>{active[0]}</strong><p>{active[2]}</p></div></div>;
+}
