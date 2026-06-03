@@ -13,7 +13,7 @@ type Tab = "tactic" | "rankings" | "import" | "validation" | "compare" | "instru
 type SortKey = "roleScore" | "recruitmentScore" | "confidenceScore" | "attribute" | "stats" | "hidden" | "position" | "value" | "age" | "minutes" | "averageRating";
 type SuitabilityFilter = "role-position" | "conversion" | "all";
 type PositionFilter = "" | "GK" | "DL" | "DC" | "DR" | "WBL" | "WBR" | "DM" | "ML" | "MC" | "MR" | "AML" | "AMC" | "AMR" | "ST";
-const APP_VERSION = "v0.2.11-settings-validation";
+const APP_VERSION = "v0.2.12-hidden-profile-scrollbars";
 const fmt = (value?: number, dp = 1) => value === undefined ? "-" : value.toFixed(dp);
 const scoreClass = (value?: number) => value === undefined ? "" : value >= 80 ? "elite" : value >= 65 ? "good" : value >= 50 ? "okay" : "low";
 const compactMoney = (value?: number) => {
@@ -292,6 +292,13 @@ function PlayerModal({ player, roleId, slot, onClose }: { player: ScoredPlayer; 
   const active = scoreForSlot(player, roleId, slot), role = ROLE_CONFIG[roleId];
   const roleWeights = new Set(Object.keys(role.attributeWeights).filter((key) => role.attributeWeights[key] >= 7));
   const faceUrl = playerFaceUrl(player), clubUrl = clubLogoUrl(player), nationUrl = nationLogoUrl(player);
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
   return <div className="backdrop" onClick={onClose}><aside className="modal fm-profile-modal" onClick={(e) => e.stopPropagation()}><button className="modal-close" onClick={onClose}>×</button>
     <section className="fm-profile-top">
       <div className="fm-player-card">
