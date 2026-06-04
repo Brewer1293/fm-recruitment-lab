@@ -15,7 +15,7 @@ type SortKey = "roleScore" | "recruitmentScore" | "confidenceScore" | "attribute
 type SuitabilityFilter = "role-position" | "conversion" | "all";
 type PositionFilter = "" | "GK" | "DL" | "DC" | "DR" | "WBL" | "WBR" | "DM" | "ML" | "MC" | "MR" | "AML" | "AMC" | "AMR" | "ST";
 type ThemeChoice = "orange" | "blue" | "emerald";
-const APP_VERSION = "v0.2.35-datahub-red-leader-dot-local";
+const APP_VERSION = "v0.2.36-mobile-load-guard-local";
 const THEME_STORAGE_KEY = "fm-recruitment-lab-theme";
 const SHORTLIST_STORAGE_KEY = "fm-recruitment-lab-shortlist";
 const THEME_OPTIONS: { value: ThemeChoice; label: string; description: string }[] = [
@@ -161,6 +161,14 @@ const slotPositionCode = (slot: SlotId) => ({
   RW: "AMR",
   ST: "ST",
 })[slot];
+const isMobileLikeDevice = () => {
+  if (typeof window === "undefined" || typeof navigator === "undefined") return false;
+  const coarsePointer = window.matchMedia?.("(pointer: coarse)").matches;
+  const narrowScreen = window.matchMedia?.("(max-width: 820px)").matches;
+  const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
+  const lowMemory = typeof memory === "number" && memory <= 4;
+  return Boolean((coarsePointer && narrowScreen) || lowMemory);
+};
 const POSITION_CODE_CACHE = new Map<string, Set<string>>();
 function positionCodes(position?: string) {
   const text = String(position ?? "").toUpperCase().replace(/\s+/g, "");
@@ -201,6 +209,7 @@ export default function Home() {
   const [selected, setSelected] = useState<ScoredPlayer | null>(null), [compareIds, setCompareIds] = useState<string[]>([]), [shortlistIds, setShortlistIds] = useState<string[]>([]);
   const [profileContext, setProfileContext] = useState<{ slot: SlotId; roleId: RoleId }>({ slot: "ST", roleId: "af-at" });
   const [dataHubCard, setDataHubCard] = useState<DataHubCardId>("attacking");
+  const [mobileLoadGuard, setMobileLoadGuard] = useState(false);
   const [search, setSearch] = useState(""), [minMinutes, setMinMinutes] = useState(0), [maxAge, setMaxAge] = useState(50);
   const [minAge, setMinAge] = useState(0), [club, setClub] = useState(""), [nation, setNation] = useState(""), [positionFilter, setPositionFilter] = useState<PositionFilter>(""), [foot, setFoot] = useState("");
   const [suitabilityFilter, setSuitabilityFilter] = useState<SuitabilityFilter>("role-position");
@@ -237,6 +246,9 @@ export default function Home() {
   const selectedRankIndex = selected ? modalPlayers.findIndex((player) => player.id === selected.id) : -1;
 
   useEffect(() => {
+    const guarded = isMobileLikeDevice();
+    setMobileLoadGuard(guarded);
+    if (guarded) return;
     if (defaultLoadStarted.current || players.length) return;
     defaultLoadStarted.current = true;
     void loadDefaultPlayers(false);
@@ -268,6 +280,11 @@ export default function Home() {
     finally { setBusy(false); }
   }
   async function loadDefaultPlayers(forceRefresh: boolean) {
+    if (mobileLoadGuard) {
+      setTab("import");
+      setError("Mobile safe mode is on. The full default database is too large for most mobile browsers, so it is not loaded automatically. Use desktop for the saved 130k-player pool, or upload a smaller HTML export here.");
+      return;
+    }
     setBusy(true); setError(""); setProgress({ message: "Loading default database", percent: 0 });
     try {
       if (forceRefresh) await clearCachedDefaultDataset();
@@ -306,8 +323,9 @@ export default function Home() {
     {error && <div className="notice error">{error}</div>}
 
     {tab === "import" && <section className="panel import-panel"><div className="import-hero"><div><span className="eyebrow">Data centre</span><h2>Load recruitment database</h2><p>Use the saved player pool or upload fresh FM24 HTML exports. Everything is parsed and scored in this browser.</p></div><div className="import-loaded"><strong>{players.length.toLocaleString()}</strong><span>players ready</span></div></div>
+      {mobileLoadGuard && <div className="notice mobile-guard"><strong>Mobile safe mode</strong><span>The saved default database is not auto-loaded on mobile because it can exceed browser memory and cause reload loops. Upload a smaller HTML export here, or use desktop for the full player pool.</span></div>}
       <div className="import-grid"><label className={busy ? "dropzone busy" : "dropzone"}><span className="drop-kicker">HTML export</span><strong>{busy ? "Reading player data..." : "Choose FM HTML files"}</strong><small>Supports large all-player exports and multiple files. Missing columns are reported after import.</small><input type="file" accept=".html,.htm,text/html" multiple disabled={busy} onChange={(event) => handleFiles(Array.from(event.target.files ?? []))} /></label>
-        <div className="default-db-actions"><button className="primary import-action" disabled={busy} onClick={() => loadDefaultPlayers(false)}><span>Default database</span><strong>Load saved player pool</strong><small>Fastest way back into the current scouting dataset.</small></button><button className="import-action" disabled={busy} onClick={() => loadDefaultPlayers(true)}><span>Cloudflare R2</span><strong>Refresh database</strong><small>Downloads the newest default file and replaces the local cache.</small></button><button className="import-action" disabled={busy} onClick={async () => { await clearCachedDefaultDataset(); setProgress({ message: "Default database cache cleared", percent: 0 }); }}><span>Browser cache</span><strong>Clear cached default</strong><small>Use this if you want the next load to start clean.</small></button></div></div>
+        <div className="default-db-actions"><button className="primary import-action" disabled={busy || mobileLoadGuard} onClick={() => loadDefaultPlayers(false)}><span>Default database</span><strong>{mobileLoadGuard ? "Desktop only" : "Load saved player pool"}</strong><small>{mobileLoadGuard ? "Blocked on mobile to prevent reload loops." : "Fastest way back into the current scouting dataset."}</small></button><button className="import-action" disabled={busy || mobileLoadGuard} onClick={() => loadDefaultPlayers(true)}><span>Cloudflare R2</span><strong>{mobileLoadGuard ? "Desktop only" : "Refresh database"}</strong><small>{mobileLoadGuard ? "Use desktop for the full saved database." : "Downloads the newest default file and replaces the local cache."}</small></button><button className="import-action" disabled={busy} onClick={async () => { await clearCachedDefaultDataset(); setProgress({ message: "Default database cache cleared", percent: 0 }); }}><span>Browser cache</span><strong>Clear cached default</strong><small>Use this if you want the next load to start clean.</small></button></div></div>
       <div className="import-foot"><div><span>01</span><strong>Export from FM</strong><small>Player search as Web Page / HTML.</small></div><div><span>02</span><strong>Import here</strong><small>Files stay local unless using the default R2 database.</small></div><div><span>03</span><strong>Validate columns</strong><small>The app shows what was detected or missing.</small></div></div>
       {busy && <div className="progress import-progress"><div style={{ width: `${progress.percent}%` }} /><span>{progress.message}: {progress.percent}%</span></div>}
     </section>}

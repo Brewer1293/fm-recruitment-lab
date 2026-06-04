@@ -408,6 +408,16 @@ nav .clear { bottom: 18px; color: var(--red); left: 0; position: absolute; }
 .progress span { font-size: 12px; inset: 5px 12px; position: absolute; }
 .import-progress { border: 1px solid rgba(255,255,255,.08); border-radius: 7px; }
 .notice { background: var(--surface); border: 1px solid var(--red); border-radius: 2px; color: var(--red); margin-bottom: 8px; padding: 10px; }
+.mobile-guard {
+  align-items: start;
+  border-color: rgba(var(--accent-rgb), .55);
+  color: var(--text);
+  display: grid;
+  gap: 4px;
+  margin: 10px 0;
+}
+.mobile-guard strong { color: var(--orange-2); text-transform: uppercase; }
+.mobile-guard span { color: var(--muted); }
 
 .report-grid, .profile-grid, .breakdown {
   display: grid;
