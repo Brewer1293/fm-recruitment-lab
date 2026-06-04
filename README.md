@@ -10,7 +10,7 @@ Live app: `https://fmapp.brewerlabs.uk/`
 - Supports very large all-player exports.
 - Scores players against balanced FM24 role profiles.
 - Separates pure role fit from signing/value logic.
-- Loads a default player database from Cloudflare R2 when available.
+- Loads full and mobile default player databases from Cloudflare R2 when available.
 - Loads player faces, club logos and nation logos from the `assets.brewerlabs.uk` asset bucket.
 - Provides FM-style player profiles, STAG stat baselines, comparison tools, import validation and export options.
 - Includes an interactive Data Hub with FM-style analytics cards and player scatter charts from imported stats.
@@ -23,7 +23,7 @@ Live app: `https://fmapp.brewerlabs.uk/`
 
 Manual FM HTML uploads are parsed in browser memory. They are not posted to an app server.
 
-The default database and graphic assets are downloaded from Cloudflare R2/CDN. Use **Clear local data** in the app to discard the current in-memory player pool. Use **Clear cached default** on the Import screen if the browser should redownload the default database next time.
+The default databases and graphic assets are downloaded from Cloudflare R2/CDN. Use **Clear local data** in the app to discard the current in-memory player pool. Use **Clear cached databases** on the Import screen if the browser should redownload the default databases next time.
 
 ## Run Locally
 
@@ -75,7 +75,19 @@ The app can load a saved default dataset from:
 https://assets.brewerlabs.uk/datasets
 ```
 
-The browser checks `default-metadata.json`, downloads the referenced compressed dataset, decompresses it locally and caches it in IndexedDB. **Refresh database** forces a new download when the R2 dataset has changed.
+Desktop browsers auto-load the full saved dataset from `default-metadata.json`. Mobile-like browsers auto-load the trimmed dataset from `mobile-metadata.json` to avoid memory/reload loops.
+
+Both datasets download the referenced compressed file, decompress locally and cache separately in IndexedDB. **Refresh active database** forces a new download for the currently selected full/mobile dataset when the R2 file has changed.
+
+Build and upload a dataset from an FM HTML export:
+
+```bash
+node scripts/build-default-dataset.mjs "/path/to/export.html" /tmp/fm-dataset default
+npx wrangler r2 object put fm-assets/datasets/default-players.json.gz --file /tmp/fm-dataset/default-players.json.gz --content-type application/gzip --remote
+npx wrangler r2 object put fm-assets/datasets/default-metadata.json --file /tmp/fm-dataset/default-metadata.json --content-type application/json --remote
+```
+
+Use `mobile` as the final script argument to generate `mobile-players.json.gz` and `mobile-metadata.json`.
 
 R2 CORS is tracked in `cloudflare-r2-cors.json`. Reapply it after changing preview ports:
 

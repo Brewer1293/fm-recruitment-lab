@@ -3,7 +3,7 @@ import type { NormalizedPlayer, ValidationReport } from "./types";
 const DEFAULT_DATA_BASE_URL = "https://assets.brewerlabs.uk/datasets";
 const DB_NAME = "fm-recruitment-default-db";
 const STORE_NAME = "datasets";
-const CACHE_KEY = "default";
+export type DefaultDatasetKind = "default" | "mobile";
 
 export type DefaultDatasetMetadata = {
   version: string;
@@ -51,26 +51,33 @@ async function openDb() {
   return db;
 }
 
-async function getCachedDataset() {
+const cacheKey = (kind: DefaultDatasetKind) => kind;
+const metadataName = (kind: DefaultDatasetKind) => `${kind}-metadata.json`;
+
+async function getCachedDataset(kind: DefaultDatasetKind) {
   const db = await openDb();
   const tx = db.transaction(STORE_NAME, "readonly");
-  const cached = await request<CachedDataset | undefined>(tx.objectStore(STORE_NAME).get(CACHE_KEY));
+  const cached = await request<CachedDataset | undefined>(tx.objectStore(STORE_NAME).get(cacheKey(kind)));
   db.close();
   return cached;
 }
 
-async function setCachedDataset(value: CachedDataset) {
+async function setCachedDataset(value: CachedDataset, kind: DefaultDatasetKind) {
   const db = await openDb();
   const tx = db.transaction(STORE_NAME, "readwrite");
-  tx.objectStore(STORE_NAME).put(value, CACHE_KEY);
+  tx.objectStore(STORE_NAME).put(value, cacheKey(kind));
   await txDone(tx);
   db.close();
 }
 
-export async function clearCachedDefaultDataset() {
+export async function clearCachedDefaultDataset(kind?: DefaultDatasetKind) {
   const db = await openDb();
   const tx = db.transaction(STORE_NAME, "readwrite");
-  tx.objectStore(STORE_NAME).delete(CACHE_KEY);
+  if (kind) tx.objectStore(STORE_NAME).delete(cacheKey(kind));
+  else {
+    tx.objectStore(STORE_NAME).delete(cacheKey("default"));
+    tx.objectStore(STORE_NAME).delete(cacheKey("mobile"));
+  }
   await txDone(tx);
   db.close();
 }
@@ -82,25 +89,26 @@ async function readGzipJson(response: Response) {
   return JSON.parse(await new Response(stream).text()) as DefaultDataset;
 }
 
-export async function loadDefaultDataset(onProgress?: (message: string, percent: number) => void) {
-  onProgress?.("Checking default database", 5);
-  const metadataResponse = await fetchDataset(`${DEFAULT_DATA_BASE_URL}/default-metadata.json`, { cache: "no-cache" });
+export async function loadDefaultDataset(onProgress?: (message: string, percent: number) => void, kind: DefaultDatasetKind = "default") {
+  const label = kind === "mobile" ? "mobile database" : "default database";
+  onProgress?.(`Checking ${label}`, 5);
+  const metadataResponse = await fetchDataset(`${DEFAULT_DATA_BASE_URL}/${metadataName(kind)}`, { cache: "no-cache" });
   if (!metadataResponse.ok) throw new Error(`Default database metadata unavailable (${metadataResponse.status}).`);
   const metadata = await metadataResponse.json() as DefaultDatasetMetadata;
-  const cached = await getCachedDataset();
-  if (cached?.metadata.version === metadata.version) {
-    onProgress?.("Loading cached default database", 100);
-    return cached.dataset;
+  const cachedForKind = await getCachedDataset(kind);
+  if (cachedForKind?.metadata.version === metadata.version) {
+    onProgress?.(`Loading cached ${label}`, 100);
+    return cachedForKind.dataset;
   }
 
-  onProgress?.("Downloading default database", 20);
+  onProgress?.(`Downloading ${label}`, 20);
   const datasetResponse = await fetchDataset(`${DEFAULT_DATA_BASE_URL}/${metadata.url.replace(/^datasets\//, "")}`, { cache: "force-cache" });
   if (!datasetResponse.ok) throw new Error(`Default database unavailable (${datasetResponse.status}).`);
-  onProgress?.("Decompressing default database", 55);
+  onProgress?.(`Decompressing ${label}`, 55);
   const dataset = await readGzipJson(datasetResponse);
-  onProgress?.("Caching default database", 80);
-  await setCachedDataset({ metadata, dataset });
-  onProgress?.("Default database ready", 100);
+  onProgress?.(`Caching ${label}`, 80);
+  await setCachedDataset({ metadata, dataset }, kind);
+  onProgress?.(`${kind === "mobile" ? "Mobile" : "Default"} database ready`, 100);
   return dataset;
 }
 

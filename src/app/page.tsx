@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { exportCSV, exportHTML } from "../lib/exports";
 import { clubLogoUrl, nationLogoUrl, playerFaceUrl } from "../lib/assetResolver";
 import { clearCachedDefaultDataset, loadDefaultDataset } from "../lib/defaultDataset";
+import type { DefaultDatasetKind } from "../lib/defaultDataset";
 import { importFMFiles } from "../lib/fmParser";
 import { adjustedNegativeMetric, adjustedPositiveMetric, leagueCoefficient } from "../lib/leagueCoefficients";
 import { PRESET_VERSION, ROLE_CONFIG, TACTIC_SLOTS } from "../lib/roleConfig";
@@ -15,7 +16,7 @@ type SortKey = "roleScore" | "recruitmentScore" | "confidenceScore" | "attribute
 type SuitabilityFilter = "role-position" | "conversion" | "all";
 type PositionFilter = "" | "GK" | "DL" | "DC" | "DR" | "WBL" | "WBR" | "DM" | "ML" | "MC" | "MR" | "AML" | "AMC" | "AMR" | "ST";
 type ThemeChoice = "orange" | "blue" | "emerald";
-const APP_VERSION = "v0.2.36-mobile-load-guard-local";
+const APP_VERSION = "v0.2.37-mobile-database-local";
 const THEME_STORAGE_KEY = "fm-recruitment-lab-theme";
 const SHORTLIST_STORAGE_KEY = "fm-recruitment-lab-shortlist";
 const THEME_OPTIONS: { value: ThemeChoice; label: string; description: string }[] = [
@@ -210,6 +211,7 @@ export default function Home() {
   const [profileContext, setProfileContext] = useState<{ slot: SlotId; roleId: RoleId }>({ slot: "ST", roleId: "af-at" });
   const [dataHubCard, setDataHubCard] = useState<DataHubCardId>("attacking");
   const [mobileLoadGuard, setMobileLoadGuard] = useState(false);
+  const [datasetKind, setDatasetKind] = useState<DefaultDatasetKind>("default");
   const [search, setSearch] = useState(""), [minMinutes, setMinMinutes] = useState(0), [maxAge, setMaxAge] = useState(50);
   const [minAge, setMinAge] = useState(0), [club, setClub] = useState(""), [nation, setNation] = useState(""), [positionFilter, setPositionFilter] = useState<PositionFilter>(""), [foot, setFoot] = useState("");
   const [suitabilityFilter, setSuitabilityFilter] = useState<SuitabilityFilter>("role-position");
@@ -247,11 +249,12 @@ export default function Home() {
 
   useEffect(() => {
     const guarded = isMobileLikeDevice();
+    const initialKind: DefaultDatasetKind = guarded ? "mobile" : "default";
     setMobileLoadGuard(guarded);
-    if (guarded) return;
+    setDatasetKind(initialKind);
     if (defaultLoadStarted.current || players.length) return;
     defaultLoadStarted.current = true;
-    void loadDefaultPlayers(false);
+    void loadDefaultPlayers(false, initialKind);
   }, [players.length]);
   useEffect(() => {
     const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
@@ -279,16 +282,12 @@ export default function Home() {
     } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
     finally { setBusy(false); }
   }
-  async function loadDefaultPlayers(forceRefresh: boolean) {
-    if (mobileLoadGuard) {
-      setTab("import");
-      setError("Mobile safe mode is on. The full default database is too large for most mobile browsers, so it is not loaded automatically. Use desktop for the saved 130k-player pool, or upload a smaller HTML export here.");
-      return;
-    }
-    setBusy(true); setError(""); setProgress({ message: "Loading default database", percent: 0 });
+  async function loadDefaultPlayers(forceRefresh: boolean, kind: DefaultDatasetKind = datasetKind) {
+    setDatasetKind(kind);
+    setBusy(true); setError(""); setProgress({ message: `Loading ${kind === "mobile" ? "mobile" : "full"} database`, percent: 0 });
     try {
-      if (forceRefresh) await clearCachedDefaultDataset();
-      const loaded = await loadDefaultDataset((message, percent) => setProgress({ message, percent }));
+      if (forceRefresh) await clearCachedDefaultDataset(kind);
+      const loaded = await loadDefaultDataset((message, percent) => setProgress({ message, percent }), kind);
       const scored = scorePlayers(loaded.players);
       setPlayers(scored); setReport(loaded.report); setTab("rankings");
     } catch (reason) {
@@ -323,9 +322,9 @@ export default function Home() {
     {error && <div className="notice error">{error}</div>}
 
     {tab === "import" && <section className="panel import-panel"><div className="import-hero"><div><span className="eyebrow">Data centre</span><h2>Load recruitment database</h2><p>Use the saved player pool or upload fresh FM24 HTML exports. Everything is parsed and scored in this browser.</p></div><div className="import-loaded"><strong>{players.length.toLocaleString()}</strong><span>players ready</span></div></div>
-      {mobileLoadGuard && <div className="notice mobile-guard"><strong>Mobile safe mode</strong><span>The saved default database is not auto-loaded on mobile because it can exceed browser memory and cause reload loops. Upload a smaller HTML export here, or use desktop for the full player pool.</span></div>}
+      {mobileLoadGuard && <div className="notice mobile-guard"><strong>Mobile database</strong><span>Mobile browsers now auto-load the smaller 7,571-player database. Use desktop for the full saved pool, or upload any HTML export here.</span></div>}
       <div className="import-grid"><label className={busy ? "dropzone busy" : "dropzone"}><span className="drop-kicker">HTML export</span><strong>{busy ? "Reading player data..." : "Choose FM HTML files"}</strong><small>Supports large all-player exports and multiple files. Missing columns are reported after import.</small><input type="file" accept=".html,.htm,text/html" multiple disabled={busy} onChange={(event) => handleFiles(Array.from(event.target.files ?? []))} /></label>
-        <div className="default-db-actions"><button className="primary import-action" disabled={busy || mobileLoadGuard} onClick={() => loadDefaultPlayers(false)}><span>Default database</span><strong>{mobileLoadGuard ? "Desktop only" : "Load saved player pool"}</strong><small>{mobileLoadGuard ? "Blocked on mobile to prevent reload loops." : "Fastest way back into the current scouting dataset."}</small></button><button className="import-action" disabled={busy || mobileLoadGuard} onClick={() => loadDefaultPlayers(true)}><span>Cloudflare R2</span><strong>{mobileLoadGuard ? "Desktop only" : "Refresh database"}</strong><small>{mobileLoadGuard ? "Use desktop for the full saved database." : "Downloads the newest default file and replaces the local cache."}</small></button><button className="import-action" disabled={busy} onClick={async () => { await clearCachedDefaultDataset(); setProgress({ message: "Default database cache cleared", percent: 0 }); }}><span>Browser cache</span><strong>Clear cached default</strong><small>Use this if you want the next load to start clean.</small></button></div></div>
+        <div className="default-db-actions"><button className="primary import-action" disabled={busy || mobileLoadGuard} onClick={() => loadDefaultPlayers(false, "default")}><span>Full database</span><strong>{mobileLoadGuard ? "Desktop only" : "Load full player pool"}</strong><small>{mobileLoadGuard ? "Use the mobile database on phones to avoid reload loops." : "Full saved scouting dataset from Cloudflare R2."}</small></button><button className="import-action" disabled={busy} onClick={() => loadDefaultPlayers(false, "mobile")}><span>Mobile database</span><strong>Load mobile player pool</strong><small>7,571 players from a trimmed export for phones and quick checks.</small></button><button className="import-action" disabled={busy} onClick={() => loadDefaultPlayers(true, mobileLoadGuard ? "mobile" : datasetKind)}><span>Cloudflare R2</span><strong>Refresh active database</strong><small>Downloads the newest {mobileLoadGuard || datasetKind === "mobile" ? "mobile" : "full"} file and replaces that local cache.</small></button><button className="import-action" disabled={busy} onClick={async () => { await clearCachedDefaultDataset(); setProgress({ message: "Default database caches cleared", percent: 0 }); }}><span>Browser cache</span><strong>Clear cached databases</strong><small>Use this if you want the next load to start clean.</small></button></div></div>
       <div className="import-foot"><div><span>01</span><strong>Export from FM</strong><small>Player search as Web Page / HTML.</small></div><div><span>02</span><strong>Import here</strong><small>Files stay local unless using the default R2 database.</small></div><div><span>03</span><strong>Validate columns</strong><small>The app shows what was detected or missing.</small></div></div>
       {busy && <div className="progress import-progress"><div style={{ width: `${progress.percent}%` }} /><span>{progress.message}: {progress.percent}%</span></div>}
     </section>}

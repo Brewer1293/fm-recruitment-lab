@@ -39,7 +39,8 @@ const USEFUL = ["age", "club", "nationality", "basedIn", "division", "uid", "val
 
 const input = resolve(process.argv[2] ?? "");
 const outDir = resolve(process.argv[3] ?? "public/default-data");
-if (!process.argv[2]) throw new Error("Usage: node scripts/build-default-dataset.mjs /path/to/export.html [out-dir]");
+const datasetName = (process.argv[4] ?? "default").replace(/[^a-z0-9-]/gi, "").toLowerCase() || "default";
+if (!process.argv[2]) throw new Error("Usage: node scripts/build-default-dataset.mjs /path/to/export.html [out-dir] [dataset-name]");
 
 const clean = (value) => String(value ?? "").replace(/<[^>]*>/g, " ").replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">").replace(/&#39;/g, "'").replace(/&quot;/gi, '"').replace(/\s+/g, " ").trim();
 const norm = (value) => clean(value).toLowerCase().replace(/\.\d+$/, "").trim();
@@ -201,11 +202,11 @@ const started = Date.now();
 console.log(`Parsing ${input}`);
 const { players, report } = await parseHtml(input);
 const generatedAt = new Date().toISOString();
-const version = `default-${generatedAt.replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z")}`;
+const version = `${datasetName}-${generatedAt.replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z")}`;
 const dataset = { version, generatedAt, sourceFile: basename(input), players, report };
-const metadata = { version, generatedAt, sourceFile: basename(input), playerCount: players.length, url: "datasets/default-players.json.gz" };
-const dataPath = resolve(outDir, "default-players.json.gz");
-const metadataPath = resolve(outDir, "default-metadata.json");
+const metadata = { version, generatedAt, sourceFile: basename(input), playerCount: players.length, url: `datasets/${datasetName}-players.json.gz` };
+const dataPath = resolve(outDir, `${datasetName}-players.json.gz`);
+const metadataPath = resolve(outDir, `${datasetName}-metadata.json`);
 await writeGzipJson(dataPath, dataset);
 await writeFile(metadataPath, `${JSON.stringify(metadata, null, 2)}\n`);
 const dataStat = await stat(dataPath);
