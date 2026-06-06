@@ -63,7 +63,9 @@ export type RoleScore = {
   legacyRoleScore: number;
   valueScore: number;
   dataScore: number;
+  metaScore: number;
   recommendationScore: number;
+  metaRecommendationScore: number;
   recruitmentScore: number;
   confidenceScore: number;
   prospectScore: number;
@@ -77,12 +79,14 @@ export type RoleScore = {
   wage: ScorePart;
   ageDevelopment: ScorePart;
   data: ScorePart;
+  meta: ScorePart;
   caps: string[];
   strengths: string[];
   weaknesses: string[];
   valuePositives: string[];
   valueConcerns: string[];
   dataNotes: string[];
+  metaNotes: string[];
   warnings: string[];
   explanation: string[];
 };
