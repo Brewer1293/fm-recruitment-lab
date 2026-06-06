@@ -3,6 +3,8 @@ import { RECRUITMENT_SCORE_WEIGHTS, ROLE_CONFIG, ROLE_SCORE_WEIGHTS } from "./ro
 import type { NormalizedPlayer, RoleConfig, RoleId, RoleScore, ScorePart, ScoredPlayer, SlotId } from "./types";
 
 const clamp = (value: number, low = 0, high = 100) => Math.min(high, Math.max(low, value));
+export const RECOMMENDATION_SCORE_WEIGHTS = { role: 0.45, value: 0.35, data: 0.20 } as const;
+const DATA_SCORE_THRESHOLDS = { veryLowMinutes: 300, lowMinutes: 900, mediumMinutes: 1800 } as const;
 const attrMap: Record<string, string> = { Acc: "acc", Pac: "pac", Sta: "sta", Str: "str", Agi: "agi", Bal: "bal", Jum: "jum", Nat: "nat", Wor: "wor", Fin: "fin", Fir: "fir", Pas: "pas", Tec: "tec", Dri: "dri", Cro: "cro", Hea: "hea", Mar: "mar", Tck: "tck", Lon: "lon", OtB: "otb", Tea: "tea", Vis: "vis", Dec: "dec", Ant: "ant", Cmp: "cmp", Cnt: "cnt", Pos: "pos", Fla: "fla", Bra: "bra", Det: "det", Ref: "ref", "1v1": "oneVOne", Cmd: "cmd", Kic: "kic", Thr: "thr", Han: "han", Aer: "aer" };
 const statTargets: Record<string, [string, number]> = { savePct: ["savePercentage", 80], cleanSheets90: ["cleanSheets90", 0.35], passCompletionPct: ["passCompletion", 90], longPassCompletionPct: ["longPassCompletion", 72], avgRating: ["averageRating", 7.6], xA90: ["xa90", 0.35], assists90: ["assists90", 0.45], keyPasses90: ["keyPasses90", 2.7], crossesCompleted90: ["crossesCompleted90", 1.8], dribblesCompleted90: ["dribbles90", 4], tacklesWon90: ["tackles90", 3.2], interceptions90: ["interceptions90", 2.6], progressivePasses90: ["progressivePasses90", 8], headersWonPct: ["headersPct", 75], xG90: ["xg90", 0.65], goals90: ["goals90", 0.75], shots90: ["shots90", 4], shotConversionPct: ["conversionPercentage", 22], errorsLeadingToGoal90: ["errorsLeadingToGoal90", 0.25] };
 
@@ -150,6 +152,93 @@ function wageScore(player: NormalizedPlayer, roleScore: number) {
   return part(clamp((expected / (player.wageK + expected * 0.35)) * 100), 1, 1);
 }
 
+function contractScore(player: NormalizedPlayer) {
+  const text = String(player.contractExpires ?? player.contractType ?? "").toLowerCase();
+  if (!text || text === "-") return part(55, 0, 1);
+  if (/free|expired|non.contract|non contract|trial/.test(text)) return part(100, 1, 1);
+  const year = Number(text.match(/20\d{2}/)?.[0]);
+  if (!year) return part(58, 1, 1);
+  if (year <= 2025) return part(88, 1, 1);
+  if (year <= 2026) return part(76, 1, 1);
+  if (year <= 2027) return part(62, 1, 1);
+  return part(48, 1, 1);
+}
+
+function abilityPotentialScore(player: NormalizedPlayer, roleScore: number) {
+  const ca = valueOf(player, "currentAbility"), pa = valueOf(player, "potentialAbility");
+  if (ca === undefined && pa === undefined) return part(50, 0, 2);
+  const values = [ca, pa].filter((value): value is number => value !== undefined).map((value) => clamp(value / 200 * 100));
+  const blended = values.reduce((sum, value) => sum + value, 0) / values.length;
+  return part(clamp(blended * 0.7 + roleScore * 0.3), values.length, 2);
+}
+
+function resaleScore(player: NormalizedPlayer) {
+  const age = Number(player.age ?? 26);
+  if (age <= 20) return part(96, player.age === undefined ? 0 : 1, 1);
+  if (age <= 23) return part(88, 1, 1);
+  if (age <= 26) return part(72, 1, 1);
+  if (age <= 29) return part(52, 1, 1);
+  if (age <= 32) return part(30, 1, 1);
+  return part(18, 1, 1);
+}
+
+function valueContextScore(player: NormalizedPlayer, config: RoleConfig, pureRoleScore: number) {
+  const league = leagueCoefficient(player);
+  const market = marketValue(player, pureRoleScore);
+  const wage = wageScore(player, pureRoleScore);
+  const age = ageDevelopment(player, config);
+  const resale = resaleScore(player);
+  const contract = contractScore(player);
+  const ability = abilityPotentialScore(player, pureRoleScore);
+  const leaguePart = part(clamp(league.coefficient * 100), player.division || player.basedIn || player.based ? 1 : 0, 1);
+  const score = clamp(
+    (market.score ?? 50) * 0.20 +
+    (wage.score ?? 50) * 0.15 +
+    (age.score ?? 50) * 0.10 +
+    (leaguePart.score ?? 50) * 0.15 +
+    (resale.score ?? 50) * 0.15 +
+    (ability.score ?? 50) * 0.10 +
+    (contract.score ?? 55) * 0.15
+  );
+  const positives: string[] = [];
+  const concerns: string[] = [];
+  if ((market.score ?? 50) >= 70) positives.push("reasonable transfer value");
+  if ((wage.score ?? 50) >= 70) positives.push("low wage for projected level");
+  if ((resale.score ?? 50) >= 75) positives.push("strong resale runway");
+  if ((contract.score ?? 55) >= 75) positives.push("favourable contract situation");
+  if (league.coefficient >= 0.9) positives.push(`${league.label} context`);
+  if (player.transferValueStatus === "not_for_sale") concerns.push("not for sale");
+  if ((market.score ?? 50) < 35) concerns.push("expensive against projected level");
+  if ((wage.score ?? 50) < 35) concerns.push("high wage risk");
+  if ((resale.score ?? 50) < 40) concerns.push("limited resale potential");
+  if (league.coefficient < 0.75) concerns.push(`league standard risk: ${league.label}`);
+  if (!ability.available) concerns.push("CA/PA not exported");
+  return { part: part(Number(score.toFixed(1)), market.available + wage.available + age.available + leaguePart.available + resale.available + ability.available + contract.available, 9), positives, concerns, market, wage, age };
+}
+
+function dataEvidenceScore(player: NormalizedPlayer, config: RoleConfig, adjustedStats: ScorePart) {
+  const minutes = Number(player.minutes ?? 0);
+  const apps = valueOf(player, "apps");
+  const goals = valueOf(player, "goals");
+  const assists = valueOf(player, "assists");
+  const rating = valueOf(player, "averageRating");
+  let base = minutes < DATA_SCORE_THRESHOLDS.veryLowMinutes ? 18 : minutes < DATA_SCORE_THRESHOLDS.lowMinutes ? 38 : minutes < DATA_SCORE_THRESHOLDS.mediumMinutes ? 65 : 86;
+  if (apps !== undefined) base += Math.min(8, apps / 4);
+  if (rating !== undefined) base += clamp((rating - 6.6) * 10, -8, 8);
+  if (goals !== undefined || assists !== undefined) base += Math.min(6, Number(goals ?? 0) * 0.5 + Number(assists ?? 0) * 0.75);
+  if (adjustedStats.available) base = base * 0.75 + (adjustedStats.score ?? 50) * 0.25;
+  const expected = Object.keys(config.positiveStatWeights).length + 4;
+  const available = adjustedStats.available + [apps, goals, assists, rating].filter((value) => value !== undefined).length;
+  const notes: string[] = [];
+  if (minutes < DATA_SCORE_THRESHOLDS.veryLowMinutes) notes.push("Under 300 mins: low sample");
+  else if (minutes < DATA_SCORE_THRESHOLDS.lowMinutes) notes.push("300-899 mins: limited sample");
+  else if (minutes < DATA_SCORE_THRESHOLDS.mediumMinutes) notes.push("900-1799 mins: medium sample");
+  else notes.push("1800+ mins: strong sample");
+  if (!adjustedStats.available) notes.push("Missing role performance stats");
+  if (rating === undefined) notes.push("Average rating not exported");
+  return { part: part(Number(clamp(base).toFixed(1)), available, expected), notes };
+}
+
 function applyCaps(player: NormalizedPlayer, config: RoleConfig, roleScore: number, familiarity: string) {
   let score = roleScore;
   const caps: string[] = [];
@@ -173,9 +262,28 @@ function applyCaps(player: NormalizedPlayer, config: RoleConfig, roleScore: numb
   return { score, caps };
 }
 
+function applyAttributeCaps(player: NormalizedPlayer, config: RoleConfig, roleScore: number) {
+  let score = roleScore;
+  const caps: string[] = [];
+  for (const cap of config.scoreCaps ?? []) {
+    let triggered = false;
+    if (cap.attribute) {
+      const value = attr(player, cap.attribute);
+      triggered = value !== undefined && value < Number(cap.lt);
+    }
+    if (cap.all) triggered = cap.all.every((item) => (attr(player, item.attribute) ?? 0) < item.lt);
+    if (triggered) {
+      score = Math.min(score, cap.maxRoleScore);
+      caps.push(`Attribute role score capped at ${cap.maxRoleScore}`);
+    }
+  }
+  return { score, caps };
+}
+
 export function scorePlayer(player: NormalizedPlayer, roleId: RoleId, slot?: SlotId): RoleScore {
   const league = leagueCoefficient(player);
   const config = ROLE_CONFIG[roleId], attribute = attributeScore(player, config), stats = statsScore(player, config), hidden = hiddenScore(player), position = positionScore(player, config, slot);
+  const pureRole = applyAttributeCaps(player, config, attribute.score ?? 50);
   const preCapRole = clamp((attribute.score ?? 50) * ROLE_SCORE_WEIGHTS.attribute + (position.part.score ?? 0) * ROLE_SCORE_WEIGHTS.positionFoot + (hidden.score ?? 50) * ROLE_SCORE_WEIGHTS.hidden + (stats.adjusted.score ?? 50) * ROLE_SCORE_WEIGHTS.stats);
   const positionValue = position.part.score ?? 0;
   const positionCaps: string[] = [];
@@ -192,11 +300,13 @@ export function scorePlayer(player: NormalizedPlayer, roleId: RoleId, slot?: Slo
   }
   const capped = applyCaps(player, config, positionCappedRole, position.familiarity);
   capped.caps.unshift(...positionCaps);
-  const value = marketValue(player, capped.score), wage = wageScore(player, capped.score), age = ageDevelopment(player, config);
+  const valueContext = valueContextScore(player, config, pureRole.score), dataContext = dataEvidenceScore(player, config, stats.adjusted);
+  const value = valueContext.market, wage = valueContext.wage, age = valueContext.age;
+  const recommendation = clamp(pureRole.score * RECOMMENDATION_SCORE_WEIGHTS.role + (valueContext.part.score ?? 50) * RECOMMENDATION_SCORE_WEIGHTS.value + (dataContext.part.score ?? 50) * RECOMMENDATION_SCORE_WEIGHTS.data);
   const recruitment = clamp(capped.score * RECRUITMENT_SCORE_WEIGHTS.role + (value.score ?? 50) * RECRUITMENT_SCORE_WEIGHTS.marketValue + (wage.score ?? 50) * RECRUITMENT_SCORE_WEIGHTS.wage + (age.score ?? 50) * RECRUITMENT_SCORE_WEIGHTS.ageDevelopment);
-  const confidence = clamp(minutesConfidence(Number(player.minutes ?? 0)) * 45 + (attribute.available / Math.max(attribute.expected, 1)) * 20 + (stats.adjusted.available / Math.max(stats.adjusted.expected, 1)) * 15 + (hidden.available ? 10 : 0) + ((position.part.score ?? 0) / 100) * 10);
-  const prospect = clamp(capped.score * 0.55 + (age.score ?? 50) * 0.25 + (value.score ?? 50) * 0.15 + (wage.score ?? 50) * 0.05);
-  const currentForm = clamp(capped.score * 0.65 + (stats.adjusted.score ?? 50) * 0.25 + confidence * 0.1);
+  const confidence = dataContext.part.score ?? 50;
+  const prospect = clamp(pureRole.score * 0.55 + (age.score ?? 50) * 0.25 + (value.score ?? 50) * 0.15 + (wage.score ?? 50) * 0.05);
+  const currentForm = clamp(pureRole.score * 0.65 + (stats.adjusted.score ?? 50) * 0.25 + confidence * 0.1);
   const warnings = config.warnings.filter((warning) => {
     const value = attr(player, warning.attribute);
     return value !== undefined && value < warning.lt;
@@ -206,13 +316,17 @@ export function scorePlayer(player: NormalizedPlayer, roleId: RoleId, slot?: Slo
   if (!hidden.available) warnings.push("Missing hidden/profile data");
   if (player.transferValueStatus === "not_for_sale") warnings.push("Not for sale: value is unavailable, not zero");
   const keyAttributes = Object.entries(config.attributeWeights).map(([key, weight]) => ({ key, value: attr(player, key), weight })).filter((item): item is { key: string; value: number; weight: number } => item.value !== undefined).sort((a, b) => (b.value * b.weight) - (a.value * a.weight));
+  const allCaps = [...pureRole.caps, ...capped.caps];
   return {
-    roleId, slot, roleScore: Number(capped.score.toFixed(1)), recruitmentScore: Number(recruitment.toFixed(1)), confidenceScore: Number(confidence.toFixed(1)), prospectScore: Number(prospect.toFixed(1)), currentFormScore: Number(currentForm.toFixed(1)),
-    attribute, stats: stats.adjusted, rawStats: Number(stats.raw.toFixed(1)), hidden, position: position.part, value, wage, ageDevelopment: age, caps: capped.caps,
+    roleId, slot, roleScore: Number(pureRole.score.toFixed(1)), legacyRoleScore: Number(capped.score.toFixed(1)), valueScore: Number((valueContext.part.score ?? 50).toFixed(1)), dataScore: Number((dataContext.part.score ?? 50).toFixed(1)), recommendationScore: Number(recommendation.toFixed(1)), recruitmentScore: Number(recruitment.toFixed(1)), confidenceScore: Number(confidence.toFixed(1)), prospectScore: Number(prospect.toFixed(1)), currentFormScore: Number(currentForm.toFixed(1)),
+    attribute, stats: stats.adjusted, rawStats: Number(stats.raw.toFixed(1)), hidden, position: position.part, value: valueContext.part, wage, ageDevelopment: age, data: dataContext.part, caps: allCaps,
     strengths: keyAttributes.slice(0, 4).map((item) => `${item.key} ${item.value}`),
     weaknesses: keyAttributes.slice(-4).filter((item) => item.value < 12).map((item) => `${item.key} ${item.value}`),
+    valuePositives: valueContext.positives,
+    valueConcerns: valueContext.concerns,
+    dataNotes: dataContext.notes,
     warnings: [...new Set(warnings)],
-    explanation: [`Role Score is pure role suitability.`, `Performance stats use ${league.label} coefficient ${league.coefficient.toFixed(2)} before minutes shrinkage.`, `Stats shrink from ${stats.raw.toFixed(1)} to ${(stats.adjusted.score ?? 50).toFixed(1)} using minutes confidence ${minutesConfidence(Number(player.minutes ?? 0)).toFixed(2)}.`, `Value, wage and age affect Recruitment Score only.`],
+    explanation: [`Role Score is pure weighted FM attributes for the selected role.`, `Legacy blended role fit would be ${capped.score.toFixed(1)} after position, hidden/profile and adjusted stats.`, `Recommendation Score blends Role ${Math.round(RECOMMENDATION_SCORE_WEIGHTS.role * 100)}%, Value ${Math.round(RECOMMENDATION_SCORE_WEIGHTS.value * 100)}%, Data ${Math.round(RECOMMENDATION_SCORE_WEIGHTS.data * 100)}%.`, `Performance stats use ${league.label} coefficient ${league.coefficient.toFixed(2)} before minutes shrinkage.`, `Stats shrink from ${stats.raw.toFixed(1)} to ${(stats.adjusted.score ?? 50).toFixed(1)} using minutes confidence ${minutesConfidence(Number(player.minutes ?? 0)).toFixed(2)}.`],
   };
 }
 

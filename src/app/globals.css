@@ -720,6 +720,21 @@ td small { color: var(--muted); display: block; margin-top: 3px; }
 tbody tr:nth-child(odd) { background: rgb(34,34,34); }
 tbody tr:nth-child(even) { background: rgb(43,43,43); background-image: var(--row-paper); }
 tbody tr:hover { background: rgba(var(--accent-rgb),.18); cursor: pointer; }
+.scouting-table th.column-hovered,
+.scouting-table td.column-hovered {
+  background: rgba(var(--accent-rgb), .105);
+  box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), .16);
+}
+.scouting-table th.column-hovered {
+  color: var(--orange-2);
+}
+.scouting-table td.cell-hovered {
+  background: rgba(var(--accent-rgb), .24);
+  box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), .38);
+}
+.scouting-table tbody tr:hover td.column-hovered {
+  background: rgba(var(--accent-rgb), .24);
+}
 .compare,
 .table-action {
   border-radius: 7px;

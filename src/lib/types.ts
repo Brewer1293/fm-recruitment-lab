@@ -21,6 +21,8 @@ export type NormalizedPlayer = Record<string, string | number | RawPlayer | unde
   valueHighM?: number;
   transferValueStatus?: "fixed" | "range" | "not_for_sale" | "missing";
   wageK?: number;
+  currentAbility?: number;
+  potentialAbility?: number;
   contractType?: string;
   contractStarted?: string;
   contractExpires?: string;
@@ -58,6 +60,10 @@ export type RoleScore = {
   roleId: RoleId;
   slot?: SlotId;
   roleScore: number;
+  legacyRoleScore: number;
+  valueScore: number;
+  dataScore: number;
+  recommendationScore: number;
   recruitmentScore: number;
   confidenceScore: number;
   prospectScore: number;
@@ -70,9 +76,13 @@ export type RoleScore = {
   value: ScorePart;
   wage: ScorePart;
   ageDevelopment: ScorePart;
+  data: ScorePart;
   caps: string[];
   strengths: string[];
   weaknesses: string[];
+  valuePositives: string[];
+  valueConcerns: string[];
+  dataNotes: string[];
   warnings: string[];
   explanation: string[];
 };

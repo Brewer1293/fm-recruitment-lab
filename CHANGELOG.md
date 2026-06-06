@@ -6,6 +6,8 @@ Update this file before each live push to the standalone FM app.
 
 ## Unreleased
 
+- Split Scouting scoring into pure attribute Role Score, Value Score, Data Score and Recommendation Score for live testing.
+- Added sortable Recommendation/Value/Data score columns, profile score explanations, top-20 local debug output and subtle table column hover highlighting.
 - Added a 7,571-player mobile default database from `MobileList.html` and auto-load it on mobile-like browsers instead of the full saved pool.
 - Added separate full/mobile default database caching and refresh controls on Import.
 - Added a mobile safe-mode guard that prevents the full default database from auto-loading on mobile-like browsers, avoiding reload loops.

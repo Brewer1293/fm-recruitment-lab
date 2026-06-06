@@ -12,11 +12,12 @@ import { scoreForSlot, scorePlayers } from "../lib/scoring";
 import type { RoleId, RoleScore, ScoredPlayer, SlotId, ValidationReport } from "../lib/types";
 
 type Tab = "tactic" | "rankings" | "datahub" | "shortlist" | "import" | "validation" | "compare" | "instructions" | "settings";
-type SortKey = "roleScore" | "recruitmentScore" | "confidenceScore" | "attribute" | "stats" | "hidden" | "position" | "value" | "age" | "minutes" | "apps" | "goals" | "assists" | "averageRating";
+type SortKey = "roleScore" | "legacyRoleScore" | "valueScore" | "dataScore" | "recommendationScore" | "recruitmentScore" | "confidenceScore" | "attribute" | "stats" | "hidden" | "position" | "value" | "age" | "minutes" | "apps" | "goals" | "assists" | "averageRating";
 type SuitabilityFilter = "role-position" | "conversion" | "all";
 type PositionFilter = "" | "GK" | "DL" | "DC" | "DR" | "WBL" | "WBR" | "DM" | "ML" | "MC" | "MR" | "AML" | "AMC" | "AMR" | "ST";
 type ThemeChoice = "orange" | "blue" | "emerald";
-const APP_VERSION = "v0.2.37-mobile-database-local";
+type ScorePartLike = { score?: number; available: number; expected: number };
+const APP_VERSION = "v0.2.38-scoring-test-live";
 const THEME_STORAGE_KEY = "fm-recruitment-lab-theme";
 const SHORTLIST_STORAGE_KEY = "fm-recruitment-lab-shortlist";
 const THEME_OPTIONS: { value: ThemeChoice; label: string; description: string }[] = [
@@ -217,7 +218,7 @@ export default function Home() {
   const [suitabilityFilter, setSuitabilityFilter] = useState<SuitabilityFilter>("role-position");
   const [maxWage, setMaxWage] = useState(1000), [maxValue, setMaxValue] = useState(500), [minScore, setMinScore] = useState(0);
   const [includeMissingStats, setIncludeMissingStats] = useState(true), [includeMissingHidden, setIncludeMissingHidden] = useState(true);
-  const [sortKey, setSortKey] = useState<SortKey>("roleScore"), [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [sortKey, setSortKey] = useState<SortKey>("recommendationScore"), [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [filtersOpen, setFiltersOpen] = useState(true);
   const defaultLoadStarted = useRef(false);
 
@@ -235,7 +236,7 @@ export default function Home() {
       (includeMissingStats || score.stats.available > 0) && (includeMissingHidden || score.hidden.available > 0);
   }).sort((a, b) => {
     const aScore = rankingScores.get(a.id)!, bScore = rankingScores.get(b.id)!;
-    const scoreValue = (score: RoleScore) => sortKey === "roleScore" ? score.roleScore : sortKey === "recruitmentScore" ? score.recruitmentScore : sortKey === "confidenceScore" ? score.confidenceScore : ["attribute", "stats", "hidden", "position", "value"].includes(sortKey) ? Number(score[sortKey as "attribute" | "stats" | "hidden" | "position" | "value"].score ?? 0) : undefined;
+    const scoreValue = (score: RoleScore) => ["roleScore", "legacyRoleScore", "valueScore", "dataScore", "recommendationScore", "recruitmentScore", "confidenceScore"].includes(sortKey) ? Number(score[sortKey as "roleScore" | "legacyRoleScore" | "valueScore" | "dataScore" | "recommendationScore" | "recruitmentScore" | "confidenceScore"] ?? 0) : ["attribute", "stats", "hidden", "position", "value"].includes(sortKey) ? Number(score[sortKey as "attribute" | "stats" | "hidden" | "position" | "value"].score ?? 0) : undefined;
     const tableValue = (player: ScoredPlayer) => sortKey === "apps" ? apps(player) : sortKey === "goals" ? goals(player) : sortKey === "assists" ? assists(player) : Number(player[sortKey] ?? 0);
     const aValue = scoreValue(aScore) ?? Number(tableValue(a) ?? 0);
     const bValue = scoreValue(bScore) ?? Number(tableValue(b) ?? 0);
@@ -273,6 +274,25 @@ export default function Home() {
   useEffect(() => {
     window.localStorage.setItem(SHORTLIST_STORAGE_KEY, JSON.stringify(shortlistIds));
   }, [shortlistIds]);
+  useEffect(() => {
+    if (!rankings.length || !["localhost", "127.0.0.1"].includes(window.location.hostname)) return;
+    console.table(rankings.slice(0, 20).map((player, index) => {
+      const score = rankingScores.get(player.id)!;
+      return {
+        rank: index + 1,
+        player: player.name,
+        club: player.club,
+        roleScore: score.roleScore,
+        valueScore: score.valueScore,
+        dataScore: score.dataScore,
+        recommendationScore: score.recommendationScore,
+        legacyRoleScore: score.legacyRoleScore,
+        positives: [...score.strengths, ...score.valuePositives].slice(0, 4).join(", "),
+        concerns: [...score.weaknesses, ...score.valueConcerns].slice(0, 4).join(", "),
+        warnings: score.warnings.slice(0, 3).join(", "),
+      };
+    }));
+  }, [rankings, rankingScores]);
 
   async function handleFiles(files: File[]) {
     setBusy(true); setError(""); setProgress({ message: "Preparing upload", percent: 0 });
@@ -299,7 +319,7 @@ export default function Home() {
     setSlot(nextSlot);
     setRoleId(nextRole);
     setProfileContext({ slot: nextSlot, roleId: nextRole });
-    setSortKey("roleScore");
+    setSortKey("recommendationScore");
     setSortDirection("desc");
     setSuitabilityFilter("role-position");
     setSelected(null);
@@ -331,7 +351,7 @@ export default function Home() {
 
     {tab === "validation" && <Validation report={report} onTactic={() => setTab("tactic")} />}
     {tab === "tactic" && <Tactic onSelect={selectSlot} />}
-    {tab === "rankings" && <section className={filtersOpen ? "rank-layout" : "rank-layout filters-collapsed"}><section className="panel filters"><div className="filters-head"><div><span className="eyebrow">{slot}</span><h2>{roleDisplayName(ROLE_CONFIG[roleId])}</h2><p>Default ranking is Best Role Fit. Use Role suitability to hide players who cannot play the selected position.</p></div><button className="filter-toggle" onClick={() => setFiltersOpen((value) => !value)}>{filtersOpen ? "Hide filters" : "Show filters"}</button></div>
+    {tab === "rankings" && <section className={filtersOpen ? "rank-layout" : "rank-layout filters-collapsed"}><section className="panel filters"><div className="filters-head"><div><span className="eyebrow">{slot}</span><h2>{roleDisplayName(ROLE_CONFIG[roleId])}</h2><p>Default ranking is Recommendation Score. Role Score is pure attribute fit; use Role suitability to hide players who cannot play the selected position.</p></div><button className="filter-toggle" onClick={() => setFiltersOpen((value) => !value)}>{filtersOpen ? "Hide filters" : "Show filters"}</button></div>
       {filtersOpen && <><div className="filter-grid"><label>Search<input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Player or club" /></label><label>Club<input value={club} onChange={(e) => setClub(e.target.value)} placeholder="Any club" /></label><label>Nation<input value={nation} onChange={(e) => setNation(e.target.value)} placeholder="Any nation" /></label><label>Position<select value={positionFilter} onChange={(e) => setPositionFilter(e.target.value as PositionFilter)}>{POSITION_OPTIONS.map((option) => <option key={option.value || "all"} value={option.value}>{option.label}</option>)}</select></label><label>Role suitability<select value={suitabilityFilter} onChange={(e) => setSuitabilityFilter(e.target.value as SuitabilityFilter)}><option value="role-position">Role position only</option><option value="conversion">Include conversions</option><option value="all">All players</option></select></label><label>Footedness<input value={foot} onChange={(e) => setFoot(e.target.value)} placeholder="left / right / either" /></label><label>Minimum minutes<input type="number" value={minMinutes} onChange={(e) => setMinMinutes(Number(e.target.value))} /></label><label>Minimum age<input type="number" value={minAge} onChange={(e) => setMinAge(Number(e.target.value))} /></label><label>Maximum age<input type="number" value={maxAge} onChange={(e) => setMaxAge(Number(e.target.value))} /></label><label>Maximum wage £k/w<input type="number" value={maxWage} onChange={(e) => setMaxWage(Number(e.target.value))} /></label><label>Maximum value £m<input type="number" value={maxValue} onChange={(e) => setMaxValue(Number(e.target.value))} /></label><label>Minimum Role Score<input type="number" value={minScore} onChange={(e) => setMinScore(Number(e.target.value))} /></label></div>
       <div className="toggles"><label><input type="checkbox" checked={includeMissingStats} onChange={(e) => setIncludeMissingStats(e.target.checked)} /> Include missing stats</label><label><input type="checkbox" checked={includeMissingHidden} onChange={(e) => setIncludeMissingHidden(e.target.checked)} /> Include missing hidden data</label>
       <button onClick={() => exportCSV(`${slot}-${roleId}-rankings.csv`, rankings, rankingScores)}>Export CSV</button><button onClick={() => exportHTML(`${slot}-${roleId}-rankings.html`, rankings, rankingScores)}>Export HTML</button></div></>}</section>
@@ -365,8 +385,12 @@ function Tactic({ onSelect }: { onSelect: (slot: SlotId, role: RoleId) => void }
   })}</div></div></section>;
 }
 function RankTable({ players, total, scores, compareIds, shortlistIds, sort, onOpen, onCompare, onShortlist }: { players: ScoredPlayer[]; total: number; scores: Map<string, RoleScore>; compareIds: string[]; shortlistIds: string[]; sort: (key: SortKey) => void; onOpen: (player: ScoredPlayer) => void; onCompare: (id: string) => void; onShortlist: (id: string) => void }) {
-  const heads: [SortKey | "name" | "club" | "position" | "valueM" | "wageK" | "apps" | "goals" | "assists", string][] = [["name", "Player"], ["age", "Age"], ["club", "Club"], ["position", "Position"], ["valueM", "FM Value"], ["wageK", "Wage"], ["roleScore", "Role Score"], ["recruitmentScore", "Recruitment"], ["confidenceScore", "Confidence"], ["attribute", "Attribute"], ["stats", "Adj Stats"], ["hidden", "Hidden/Profile"], ["position", "Position Score"], ["value", "Value Score"], ["apps", "Apps"], ["goals", "Goals"], ["assists", "Assists"], ["minutes", "Mins"], ["averageRating", "Av Rat"]];
-  return <section className="panel table-panel"><div className="panel-head"><strong>{total.toLocaleString()} scouting matches</strong><span>{total > players.length ? `Showing first ${players.length.toLocaleString()} results` : "Showing all results"}</span></div>{!players.length ? <div className="empty-state">No players match the current filters.</div> : <div className="table-scroll"><table><thead><tr><th>#</th><th>Compare</th><th>Shortlist</th>{heads.map(([key, label]) => <th key={`${key}-${label}`} onClick={() => sort(key as SortKey)}>{label}</th>)}<th>Caps</th><th>Warnings</th></tr></thead><tbody>{players.map((player, index) => { const score = scores.get(player.id)!; return <tr key={player.id} onClick={() => onOpen(player)}><td>{index + 1}</td><td><button title="Compare player" className={compareIds.includes(player.id) ? "table-action active" : "table-action"} onClick={(e) => { e.stopPropagation(); onCompare(player.id); }}>+</button></td><td><button title="Toggle shortlist" className={shortlistIds.includes(player.id) ? "table-action shortlist active" : "table-action shortlist"} onClick={(e) => { e.stopPropagation(); onShortlist(player.id); }}>★</button></td><td><strong>{player.name}</strong><small>{player.nationality}</small></td><td>{fmt(player.age, 0)}</td><td>{player.club}</td><td>{player.position}</td><td>{money(player)}</td><td>{compactWage(player.wageK)}</td><td className={scoreClass(score.roleScore)}>{fmt(score.roleScore)}</td><td>{fmt(score.recruitmentScore)}</td><td>{fmt(score.confidenceScore)}</td><td>{fmt(score.attribute.score)}</td><td>{fmt(score.stats.score)}</td><td>{fmt(score.hidden.score)}</td><td>{fmt(score.position.score)}</td><td>{fmt(score.value.score)}</td><td>{fmt(apps(player), 0)}</td><td>{fmt(goals(player), 0)}</td><td>{fmt(assists(player), 0)}</td><td>{fmt(player.minutes, 0)}</td><td>{fmt(player.averageRating, 2)}</td><td>{score.caps.join(", ") || "-"}</td><td>{score.warnings[0] ?? "-"}</td></tr>; })}</tbody></table></div>}</section>;
+  const [hoveredColumn, setHoveredColumn] = useState<number | null>(null);
+  const [activeCell, setActiveCell] = useState<string | null>(null);
+  const heads: [SortKey | "name" | "club" | "position" | "valueM" | "wageK", string][] = [["name", "Player"], ["age", "Age"], ["club", "Club"], ["position", "Position"], ["valueM", "Value"], ["wageK", "Wage"], ["roleScore", "Role Score"], ["valueScore", "Value Score"], ["dataScore", "Data Score"], ["recommendationScore", "Recommendation"], ["position", "Position Score"], ["attribute", "Attribute Score"], ["minutes", "Minutes"], ["apps", "Apps"], ["goals", "Goals"], ["assists", "Assists"], ["averageRating", "Av Rating"]];
+  const columnClass = (column: number, key: string) => `${hoveredColumn === column ? "column-hovered" : ""} ${activeCell === key ? "cell-hovered" : ""}`.trim();
+  const cellEvents = (column: number, key: string) => ({ className: columnClass(column, key), onMouseEnter: () => { setHoveredColumn(column); setActiveCell(key); } });
+  return <section className="panel table-panel"><div className="panel-head"><strong>{total.toLocaleString()} scouting matches</strong><span>{total > players.length ? `Showing first ${players.length.toLocaleString()} results` : "Showing all results"}</span></div>{!players.length ? <div className="empty-state">No players match the current filters.</div> : <div className="table-scroll" onMouseLeave={() => { setHoveredColumn(null); setActiveCell(null); }}><table className="scouting-table"><thead><tr><th className={hoveredColumn === 0 ? "column-hovered" : ""}>#</th><th className={hoveredColumn === 1 ? "column-hovered" : ""}>Compare</th><th className={hoveredColumn === 2 ? "column-hovered" : ""}>Shortlist</th>{heads.map(([key, label], index) => <th key={`${key}-${label}`} className={hoveredColumn === index + 3 ? "column-hovered" : ""} onMouseEnter={() => setHoveredColumn(index + 3)} onClick={() => sort(key as SortKey)}>{label}</th>)}<th className={hoveredColumn === heads.length + 3 ? "column-hovered" : ""}>Warnings</th></tr></thead><tbody>{players.map((player, index) => { const score = scores.get(player.id)!; return <tr key={player.id} onClick={() => onOpen(player)}><td {...cellEvents(0, `${player.id}-rank`)}>{index + 1}</td><td {...cellEvents(1, `${player.id}-compare`)}><button title="Compare player" className={compareIds.includes(player.id) ? "table-action active" : "table-action"} onClick={(e) => { e.stopPropagation(); onCompare(player.id); }}>+</button></td><td {...cellEvents(2, `${player.id}-shortlist`)}><button title="Toggle shortlist" className={shortlistIds.includes(player.id) ? "table-action shortlist active" : "table-action shortlist"} onClick={(e) => { e.stopPropagation(); onShortlist(player.id); }}>★</button></td><td {...cellEvents(3, `${player.id}-name`)}><strong>{player.name}</strong><small>{player.nationality}</small></td><td {...cellEvents(4, `${player.id}-age`)}>{fmt(player.age, 0)}</td><td {...cellEvents(5, `${player.id}-club`)}>{player.club}</td><td {...cellEvents(6, `${player.id}-position`)}>{player.position}</td><td {...cellEvents(7, `${player.id}-value`)}>{money(player)}</td><td {...cellEvents(8, `${player.id}-wage`)}>{compactWage(player.wageK)}</td><td {...cellEvents(9, `${player.id}-role`)} className={`${cellEvents(9, `${player.id}-role`).className} ${scoreClass(score.roleScore)}`}>{fmt(score.roleScore)}</td><td {...cellEvents(10, `${player.id}-value-score`)}>{fmt(score.valueScore)}</td><td {...cellEvents(11, `${player.id}-data-score`)}>{fmt(score.dataScore)}</td><td {...cellEvents(12, `${player.id}-recommendation`)} className={`${cellEvents(12, `${player.id}-recommendation`).className} ${scoreClass(score.recommendationScore)}`}>{fmt(score.recommendationScore)}</td><td {...cellEvents(13, `${player.id}-position-score`)}>{fmt(score.position.score)}</td><td {...cellEvents(14, `${player.id}-attribute`)}>{fmt(score.attribute.score)}</td><td {...cellEvents(15, `${player.id}-minutes`)}>{fmt(player.minutes, 0)}</td><td {...cellEvents(16, `${player.id}-apps`)}>{fmt(apps(player), 0)}</td><td {...cellEvents(17, `${player.id}-goals`)}>{fmt(goals(player), 0)}</td><td {...cellEvents(18, `${player.id}-assists`)}>{fmt(assists(player), 0)}</td><td {...cellEvents(19, `${player.id}-rating`)}>{fmt(player.averageRating, 2)}</td><td {...cellEvents(20, `${player.id}-warnings`)}>{score.warnings[0] ?? "-"}</td></tr>; })}</tbody></table></div>}</section>;
 }
 function DataHub({ players, roleId, slot, activeCardId, onCardChange, onOpen }: { players: ScoredPlayer[]; roleId: RoleId; slot: SlotId; activeCardId: DataHubCardId; onCardChange: (id: DataHubCardId) => void; onOpen: (player: ScoredPlayer, context?: { slot: SlotId; roleId: RoleId }) => void }) {
   const [hubSlot, setHubSlot] = useState<SlotId>(slot);
@@ -784,12 +808,16 @@ function TopInfoCard({ player }: { player: ScoredPlayer }) {
   </div>;
 }
 function Breakdown({ score }: { score: RoleScore }) {
-  const parts: [string, RoleScore[keyof Pick<RoleScore, "attribute" | "stats" | "hidden" | "position" | "value">], string][] = [
+  const parts: [string, ScorePartLike, string][] = [
+    ["Role Score", { score: score.roleScore, available: score.attribute.available, expected: score.attribute.expected }, "Pure attribute fit for the selected role/duty. This ignores age, value, wage, league, minutes, form, hidden data and position."],
+    ["Value Score", { score: score.valueScore, available: score.value.available, expected: score.value.expected }, `Signing context: ${[...score.valuePositives, ...score.valueConcerns].slice(0, 4).join(", ") || "neutral value profile"}.`],
+    ["Data Score", score.data, `Evidence confidence from minutes, apps, rating and role stats. ${score.dataNotes.join(" ")}`],
+    ["Recommendation", { score: score.recommendationScore, available: 3, expected: 3 }, "Priority score for scouting order: 45% Role Score, 35% Value Score and 20% Data Score."],
     ["Attributes", score.attribute, "Raw FM attributes normalised to 0-100 using this role's direct 0-10 weights. This is the main role-fit driver."],
     ["Adjusted Stats", score.stats, `Performance output after minutes shrinkage. Raw stats are ${fmt(score.rawStats)} before low-sample adjustment, so tiny samples are pulled back towards 50.`],
     ["Hidden/Profile", score.hidden, "Consistency, professionalism, important matches and similar profile data where exported. Missing hidden data is treated neutrally and lowers confidence."],
     ["Position/Foot", score.position, "Position familiarity plus the role's footedness rules. Natural role positions score highest; conversions and wrong-sided feet are capped or reduced."],
-    ["Value", score.value, "Market value and wage efficiency context for recruitment. This does not inflate pure Role Score; it matters more in signing/value decisions."],
+    ["Legacy Blend", { score: score.legacyRoleScore, available: 4, expected: 4 }, "The previous style blended role fit using attributes, position/foot, hidden/profile and adjusted stats. Kept here for local comparison."],
   ];
   const [selected, setSelected] = useState(parts[0][0]);
   const active = parts.find(([label]) => label === selected) ?? parts[0];
