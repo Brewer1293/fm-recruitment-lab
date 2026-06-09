@@ -6,6 +6,14 @@ Update this file before each live push to the standalone FM app.
 
 ## Unreleased
 
+- Improved Role Score calibration with conservative missing-attribute imputation, coverage penalties, super-linear key attributes, weakest-link penalties and wider role caps.
+- Added Vitest scoring tests covering missing attributes, elite-vs-mediocre profiles, caps and no-attribute edge cases.
+- Added a developer calibration script for checking Role Score correlation against league-adjusted average rating and spotting potentially over/under-weighted attributes.
+- Fixed FM multi-side position parsing such as `AM (RLC)`, `D (RLC)` and `WB/M (L)` so elite wide players and hybrid defenders are ranked in the correct tactic slots.
+- Changed Role Score to the intended football-fit blend: attributes, position/foot, hidden/profile and adjusted stats, with Attribute Score remaining separate.
+- Tightened Full Back - Attack scoring so central D/DM/M hybrids, low-crossing players and slower full-backs cannot sit unrealistically above elite attacking full-backs.
+- Added opt-in dataset benchmark rank guardrails so known elite anchors must stay within believable ranking ranges when `RUN_DATASET_BENCHMARK=1` is used.
+- Made the Compare screen use the active tactic slot score, so side-aware roles such as LB/RB/LW/RW match the calibrated Scouting rankings.
 - Added experimental Meta Score and Meta Rec columns using forum-style FM match-engine weighting for live testing.
 - Split Scouting scoring into pure attribute Role Score, Value Score, Data Score and Recommendation Score for live testing.
 - Added sortable Recommendation/Value/Data score columns, profile score explanations, top-20 local debug output and subtle table column hover highlighting.

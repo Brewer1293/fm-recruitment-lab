@@ -37,6 +37,13 @@ const attackerWeights = {
   Fla: 7, Bra: 4, Det: 5,
 };
 
+const insideForwardWeights = {
+  Acc: 10, Pac: 10, Sta: 6, Str: 4, Agi: 8, Bal: 7, Jum: 3, Nat: 5, Wor: 4,
+  Fin: 8, Fir: 8, Pas: 6, Tec: 8, Dri: 10, Cro: 2, Hea: 1, Mar: 0, Tck: 0,
+  Lon: 6, OtB: 9, Tea: 5, Vis: 6, Dec: 7, Ant: 8, Cmp: 7, Cnt: 4, Pos: 1,
+  Fla: 8, Bra: 3, Det: 5,
+};
+
 export const ROLE_CONFIG: Record<RoleId, RoleConfig> = {
   "sk-su": {
     id: "sk-su", shortName: "SK-Su", label: "Sweeper Keeper", duty: "Support", positions: ["GK"], ageCurveGroup: "goalkeeper", footRule: "CENTRAL_NEUTRAL",
@@ -44,6 +51,7 @@ export const ROLE_CONFIG: Record<RoleId, RoleConfig> = {
     positiveStatWeights: { savePct: 0.42, cleanSheets90: 0.22, passCompletionPct: 0.14, longPassCompletionPct: 0.14, avgRating: 0.08 },
     negativeStatPenalties: { errorsLeadingToGoal90: 0.2 },
     floorPenalties: [{ attribute: "Ref", lt: 12, minus: 5 }, { attribute: "Cmd", lt: 11, minus: 4 }, { attribute: "Pos", lt: 11, minus: 4 }, { attribute: "Han", lt: 11, minus: 3 }],
+    scoreCaps: [{ attribute: "Ref", lt: 10, maxRoleScore: 68 }, { attribute: "Han", lt: 10, maxRoleScore: 72 }, { attribute: "Aer", lt: 10, maxRoleScore: 72 }, { all: [{ attribute: "Acc", lt: 9 }, { attribute: "Pac", lt: 9 }], maxRoleScore: 70 }],
     warnings: [{ attribute: "Ref", lt: 12, label: "Low reflexes for SK" }, { attribute: "Han", lt: 11, label: "Handling concern" }, { attribute: "Kic", lt: 10, label: "Distribution concern" }],
   },
   "fb-at": {
@@ -52,6 +60,7 @@ export const ROLE_CONFIG: Record<RoleId, RoleConfig> = {
     positiveStatWeights: { xA90: 0.18, assists90: 0.14, keyPasses90: 0.12, crossesCompleted90: 0.18, dribblesCompleted90: 0.1, tacklesWon90: 0.1, interceptions90: 0.1, passCompletionPct: 0.08 },
     negativeStatPenalties: { errorsLeadingToGoal90: 0.08 },
     floorPenalties: [{ attribute: "Acc", lt: 12, minus: 3 }, { attribute: "Pac", lt: 12, minus: 3 }, { attribute: "Sta", lt: 12, minus: 4 }, { attribute: "Cro", lt: 11, minus: 4 }],
+    scoreCaps: [{ positionNotAtLeast: "Accomplished", maxRoleScore: 68 }, { all: [{ attribute: "Acc", lt: 13 }, { attribute: "Pac", lt: 13 }], maxRoleScore: 68 }, { all: [{ attribute: "Acc", lt: 11 }, { attribute: "Pac", lt: 11 }], maxRoleScore: 64 }, { attribute: "Sta", lt: 10, maxRoleScore: 72 }, { attribute: "Cro", lt: 13, maxRoleScore: 70 }, { attribute: "Wor", lt: 9, maxRoleScore: 76 }],
     warnings: [{ attribute: "Acc", lt: 12, label: "Acceleration concern" }, { attribute: "Pac", lt: 12, label: "Pace concern" }, { attribute: "Sta", lt: 12, label: "Stamina concern" }, { attribute: "Cro", lt: 11, label: "Crossing concern" }],
   },
   "bpd-de": {
@@ -60,6 +69,7 @@ export const ROLE_CONFIG: Record<RoleId, RoleConfig> = {
     positiveStatWeights: { passCompletionPct: 0.2, progressivePasses90: 0.2, longPassCompletionPct: 0.14, tacklesWon90: 0.12, interceptions90: 0.14, headersWonPct: 0.1, cleanSheets90: 0.04, keyPasses90: 0.06 },
     negativeStatPenalties: { errorsLeadingToGoal90: 0.14 },
     floorPenalties: [{ attribute: "Pac", lt: 12, minus: 3 }, { attribute: "Jum", lt: 13, minus: 3 }, { attribute: "Pas", lt: 11, minus: 4 }, { attribute: "Dec", lt: 11, minus: 4 }, { attribute: "Tec", lt: 10, minus: 3 }, { attribute: "Tck", lt: 11, minus: 4 }],
+    scoreCaps: [{ attribute: "Pac", lt: 10, maxRoleScore: 70 }, { attribute: "Jum", lt: 10, maxRoleScore: 72 }, { attribute: "Tck", lt: 9, maxRoleScore: 72 }, { all: [{ attribute: "Pas", lt: 9 }, { attribute: "Tec", lt: 9 }], maxRoleScore: 70 }, { all: [{ attribute: "Cnt", lt: 9 }, { attribute: "Pos", lt: 9 }], maxRoleScore: 72 }],
     warnings: [{ attribute: "Pac", lt: 12, label: "Pace concern" }, { attribute: "Jum", lt: 13, label: "Aerial concern" }, { attribute: "Pas", lt: 11, label: "Passing concern" }, { attribute: "Dec", lt: 11, label: "Decision-making concern" }, { attribute: "Tck", lt: 11, label: "Tackling concern" }],
   },
   "dm-su": {
@@ -68,15 +78,17 @@ export const ROLE_CONFIG: Record<RoleId, RoleConfig> = {
     positiveStatWeights: { tacklesWon90: 0.18, interceptions90: 0.18, passCompletionPct: 0.18, progressivePasses90: 0.12, keyPasses90: 0.08, xA90: 0.06, headersWonPct: 0.08, avgRating: 0.12 },
     negativeStatPenalties: { errorsLeadingToGoal90: 0.08 },
     floorPenalties: [{ attribute: "Pos", lt: 12, minus: 5 }, { attribute: "Dec", lt: 11, minus: 4 }, { attribute: "Tck", lt: 11, minus: 4 }, { attribute: "Pas", lt: 11, minus: 3 }],
+    scoreCaps: [{ attribute: "Pos", lt: 10, maxRoleScore: 72 }, { attribute: "Tck", lt: 9, maxRoleScore: 72 }, { attribute: "Dec", lt: 9, maxRoleScore: 74 }, { attribute: "Pas", lt: 9, maxRoleScore: 76 }, { all: [{ attribute: "Acc", lt: 10 }, { attribute: "Pac", lt: 10 }], maxRoleScore: 72 }],
     warnings: [{ attribute: "Pos", lt: 12, label: "Positioning concern" }, { attribute: "Dec", lt: 11, label: "Decision-making concern" }, { attribute: "Tck", lt: 11, label: "Tackling concern" }, { attribute: "Pas", lt: 11, label: "Passing concern" }],
   },
   "if-su": {
     id: "if-su", shortName: "IF-Su", label: "Inside Forward", duty: "Support", positions: ["AML", "AMR", "ST"], ageCurveGroup: "attacker", footRule: "IF_SU_LW",
-    attributeWeights: attackerWeights,
+    attributeWeights: insideForwardWeights,
     positiveStatWeights: { xG90: 0.2, goals90: 0.16, xA90: 0.14, assists90: 0.1, shots90: 0.1, shotConversionPct: 0.08, dribblesCompleted90: 0.12, keyPasses90: 0.1 },
     negativeStatPenalties: { errorsLeadingToGoal90: 0.04 },
-    floorPenalties: [{ attribute: "Acc", lt: 13, minus: 3 }, { attribute: "Pac", lt: 13, minus: 3 }, { attribute: "Dri", lt: 12, minus: 4 }, { attribute: "Fir", lt: 11, minus: 3 }],
-    warnings: [{ attribute: "Acc", lt: 13, label: "Acceleration concern" }, { attribute: "Pac", lt: 13, label: "Pace concern" }, { attribute: "Dri", lt: 12, label: "Dribbling concern" }, { attribute: "Fir", lt: 11, label: "First touch concern" }],
+    floorPenalties: [{ attribute: "Acc", lt: 13, minus: 3 }, { attribute: "Pac", lt: 13, minus: 3 }, { attribute: "Dri", lt: 12, minus: 5 }, { attribute: "OtB", lt: 11, minus: 4 }, { attribute: "Fin", lt: 10, minus: 3 }, { attribute: "Fir", lt: 11, minus: 3 }],
+    scoreCaps: [{ all: [{ attribute: "Acc", lt: 11 }, { attribute: "Pac", lt: 11 }], maxRoleScore: 68 }, { attribute: "Dri", lt: 11, maxRoleScore: 70 }, { attribute: "Fin", lt: 10, maxRoleScore: 72 }, { attribute: "OtB", lt: 10, maxRoleScore: 72 }, { all: [{ attribute: "Fla", lt: 10 }, { attribute: "Tec", lt: 10 }], maxRoleScore: 72 }],
+    warnings: [{ attribute: "Acc", lt: 13, label: "Acceleration concern" }, { attribute: "Pac", lt: 13, label: "Pace concern" }, { attribute: "Dri", lt: 12, label: "Dribbling concern" }, { attribute: "OtB", lt: 11, label: "Off the ball concern" }, { attribute: "Fin", lt: 10, label: "Finishing concern" }, { attribute: "Fir", lt: 11, label: "First touch concern" }],
   },
   "am-at": {
     id: "am-at", shortName: "AM-At", label: "Attacking Midfielder", duty: "Attack", positions: ["AMC", "MC"], ageCurveGroup: "attacker", footRule: "CENTRAL_NEUTRAL_PLUS_TWO_FOOT",
@@ -84,6 +96,7 @@ export const ROLE_CONFIG: Record<RoleId, RoleConfig> = {
     positiveStatWeights: { xA90: 0.2, keyPasses90: 0.18, xG90: 0.12, goals90: 0.1, assists90: 0.1, dribblesCompleted90: 0.12, passCompletionPct: 0.08, shots90: 0.05, shotConversionPct: 0.05 },
     negativeStatPenalties: { errorsLeadingToGoal90: 0.04 },
     floorPenalties: [{ attribute: "Dec", lt: 12, minus: 4 }, { attribute: "Tec", lt: 12, minus: 4 }, { attribute: "Pas", lt: 11, minus: 3 }, { attribute: "Fla", lt: 11, minus: 2 }],
+    scoreCaps: [{ attribute: "Tec", lt: 10, maxRoleScore: 72 }, { attribute: "Dec", lt: 10, maxRoleScore: 72 }, { attribute: "Pas", lt: 9, maxRoleScore: 74 }, { attribute: "Fir", lt: 9, maxRoleScore: 74 }, { attribute: "OtB", lt: 9, maxRoleScore: 74 }, { all: [{ attribute: "Fla", lt: 10 }, { attribute: "Vis", lt: 10 }], maxRoleScore: 74 }, { all: [{ attribute: "Acc", lt: 10 }, { attribute: "Pac", lt: 10 }], maxRoleScore: 76 }],
     warnings: [{ attribute: "Dec", lt: 12, label: "Decision-making concern" }, { attribute: "Tec", lt: 12, label: "Technique concern" }, { attribute: "Pas", lt: 11, label: "Passing concern" }, { attribute: "Fla", lt: 11, label: "Flair concern" }],
   },
   "af-at": {

@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "calibrate": "tsx scripts/calibrate.ts",
+    "test": "vitest run",
     "start": "next start"
   },
   "dependencies": {
@@ -16,6 +18,8 @@
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "typescript": "^5.6.0"
+    "tsx": "^4.22.4",
+    "typescript": "^5.6.0",
+    "vitest": "^4.1.8"
   }
 }

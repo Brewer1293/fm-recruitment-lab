@@ -1,10 +1,19 @@
 import { adjustedNegativeMetric, adjustedPositiveMetric, leagueCoefficient } from "./leagueCoefficients";
 import { RECRUITMENT_SCORE_WEIGHTS, ROLE_CONFIG, ROLE_SCORE_WEIGHTS } from "./roleConfig";
-import type { NormalizedPlayer, RoleConfig, RoleId, RoleScore, ScorePart, ScoredPlayer, SlotId } from "./types";
+import type { NormalizedPlayer, PositionFamiliarity, RoleConfig, RoleId, RoleScore, ScorePart, ScoredPlayer, SlotId } from "./types";
 
 const clamp = (value: number, low = 0, high = 100) => Math.min(high, Math.max(low, value));
 export const RECOMMENDATION_SCORE_WEIGHTS = { role: 0.45, value: 0.35, data: 0.20 } as const;
 export const META_RECOMMENDATION_SCORE_WEIGHTS = { role: 0.35, value: 0.25, data: 0.15, meta: 0.25 } as const;
+export const ATTRIBUTE_SCORE_TUNING = {
+  missingAttributeDefault: 9,
+  coveragePenaltyStrength: 0.35,
+  keyAttributeMinWeight: 8,
+  keyAttributeExponent: 1.3,
+  keyAttributeFloor: 12,
+  weakestLinkPenaltyPerPoint: 1.4,
+  maxWeakestLinkPenalty: 14,
+} as const;
 const DATA_SCORE_THRESHOLDS = { veryLowMinutes: 300, lowMinutes: 900, mediumMinutes: 1800 } as const;
 const attrMap: Record<string, string> = { Acc: "acc", Pac: "pac", Sta: "sta", Str: "str", Agi: "agi", Bal: "bal", Jum: "jum", Nat: "nat", Wor: "wor", Fin: "fin", Fir: "fir", Pas: "pas", Tec: "tec", Dri: "dri", Cro: "cro", Hea: "hea", Mar: "mar", Tck: "tck", Lon: "lon", OtB: "otb", Tea: "tea", Vis: "vis", Dec: "dec", Ant: "ant", Cmp: "cmp", Cnt: "cnt", Pos: "pos", Fla: "fla", Bra: "bra", Det: "det", Ref: "ref", "1v1": "oneVOne", Cmd: "cmd", Kic: "kic", Thr: "thr", Han: "han", Aer: "aer" };
 const statTargets: Record<string, [string, number]> = { savePct: ["savePercentage", 80], cleanSheets90: ["cleanSheets90", 0.35], passCompletionPct: ["passCompletion", 90], longPassCompletionPct: ["longPassCompletion", 72], avgRating: ["averageRating", 7.6], xA90: ["xa90", 0.35], assists90: ["assists90", 0.45], keyPasses90: ["keyPasses90", 2.7], crossesCompleted90: ["crossesCompleted90", 1.8], dribblesCompleted90: ["dribbles90", 4], tacklesWon90: ["tackles90", 3.2], interceptions90: ["interceptions90", 2.6], progressivePasses90: ["progressivePasses90", 8], headersWonPct: ["headersPct", 75], xG90: ["xg90", 0.65], goals90: ["goals90", 0.75], shots90: ["shots90", 4], shotConversionPct: ["conversionPercentage", 22], errorsLeadingToGoal90: ["errorsLeadingToGoal90", 0.25] };
@@ -24,20 +33,32 @@ function minutesConfidence(minutes = 0) {
 }
 
 function attributeScore(player: NormalizedPlayer, config: RoleConfig) {
-  let total = 0, weight = 0, available = 0;
+  let total = 0, weight = 0, available = 0, expected = 0, weakestLinkPenalty = 0;
   for (const [key, rawWeight] of Object.entries(config.attributeWeights)) {
     if (rawWeight <= 0) continue;
-    const value = attr(player, key);
-    if (value === undefined) continue;
-    total += clamp(value / 20 * 100) * rawWeight;
+    expected += 1;
+    const exportedValue = attr(player, key);
+    const value = exportedValue ?? ATTRIBUTE_SCORE_TUNING.missingAttributeDefault;
+    if (exportedValue !== undefined) available += 1;
+    const normalized = clamp(value / 20 * 100);
+    const shaped = rawWeight >= ATTRIBUTE_SCORE_TUNING.keyAttributeMinWeight
+      ? clamp(100 * ((normalized / 100) ** ATTRIBUTE_SCORE_TUNING.keyAttributeExponent))
+      : normalized;
+    if (rawWeight >= ATTRIBUTE_SCORE_TUNING.keyAttributeMinWeight && value < ATTRIBUTE_SCORE_TUNING.keyAttributeFloor) {
+      weakestLinkPenalty += (ATTRIBUTE_SCORE_TUNING.keyAttributeFloor - value) * ATTRIBUTE_SCORE_TUNING.weakestLinkPenaltyPerPoint;
+    }
+    total += shaped * rawWeight;
     weight += rawWeight;
-    available += 1;
   }
   const floorPenalty = Math.min(15, config.floorPenalties.reduce((sum, penalty) => {
-    const value = attr(player, penalty.attribute);
-    return value !== undefined && value < penalty.lt ? sum + penalty.minus : sum;
+    const value = attr(player, penalty.attribute) ?? ATTRIBUTE_SCORE_TUNING.missingAttributeDefault;
+    return value < penalty.lt ? sum + penalty.minus : sum;
   }, 0));
-  return part(weight ? clamp(total / weight - floorPenalty) : 50, available, Object.keys(config.attributeWeights).length);
+  if (!available || !weight) return part(undefined, available, expected);
+  const coverage = available / Math.max(expected, 1);
+  const coverageFactor = 1 - ((1 - coverage) * ATTRIBUTE_SCORE_TUNING.coveragePenaltyStrength);
+  const cappedWeakestPenalty = Math.min(ATTRIBUTE_SCORE_TUNING.maxWeakestLinkPenalty, weakestLinkPenalty);
+  return part(clamp((total / weight) * coverageFactor - floorPenalty - cappedWeakestPenalty), available, expected);
 }
 
 function weightedAttributeScore(player: NormalizedPlayer, weights: Record<string, number>) {
@@ -50,7 +71,7 @@ function weightedAttributeScore(player: NormalizedPlayer, weights: Record<string
     weight += rawWeight;
     available += 1;
   }
-  return part(weight ? clamp(total / weight) : 50, available, Object.keys(weights).length);
+  return part(weight ? clamp(total / weight) : undefined, available, Object.keys(weights).length);
 }
 
 function metaWeights(config: RoleConfig) {
@@ -81,7 +102,7 @@ function metaScore(player: NormalizedPlayer, config: RoleConfig) {
   const workRateAdjustment = workRate === undefined ? 0 : workRate < 6 ? -5 : workRate <= 8 ? 2 : 0;
   const dirtiness = valueOf(player, "dirtiness");
   const dirtinessAdjustment = dirtiness === undefined ? 0 : dirtiness >= 15 ? -8 : dirtiness >= 11 ? -4 : 0;
-  const score = part(Number(clamp((base.score ?? 50) + thresholdAdjustment + workRateAdjustment + dirtinessAdjustment).toFixed(1)), base.available, base.expected);
+  const score = part(base.score === undefined ? undefined : Number(clamp(base.score + thresholdAdjustment + workRateAdjustment + dirtinessAdjustment).toFixed(1)), base.available, base.expected);
   const sorted = Object.entries(weights)
     .map(([key, weight]) => ({ key, weight, value: attr(player, key) }))
     .filter((item): item is { key: string; weight: number; value: number } => item.value !== undefined)
@@ -131,6 +152,30 @@ function parsedPositions(player: NormalizedPlayer) {
   const text = String(player.position ?? "").toUpperCase().replace(/\s+/g, "");
   const out = new Set<string>();
   [["D(L)", "DL"], ["D(R)", "DR"], ["D(C)", "DC"], ["WB(L)", "WBL"], ["WB(R)", "WBR"], ["M(C)", "MC"], ["AM(C)", "AMC"], ["AM(L)", "AML"], ["AM(R)", "AMR"], ["ST(C)", "ST"]].forEach(([needle, value]) => { if (text.includes(needle)) out.add(value); });
+  for (const match of text.matchAll(/([A-Z/]+)\(([LRC]+)\)/g)) {
+    const groups = match[1].split("/");
+    const sides = match[2];
+    for (const group of groups) {
+      if (group === "D") {
+        if (sides.includes("L")) out.add("DL");
+        if (sides.includes("R")) out.add("DR");
+        if (sides.includes("C")) out.add("DC");
+      } else if (group === "WB") {
+        if (sides.includes("L")) out.add("WBL");
+        if (sides.includes("R")) out.add("WBR");
+      } else if (group === "M") {
+        if (sides.includes("L")) out.add("ML");
+        if (sides.includes("R")) out.add("MR");
+        if (sides.includes("C")) out.add("MC");
+      } else if (group === "AM") {
+        if (sides.includes("L")) out.add("AML");
+        if (sides.includes("R")) out.add("AMR");
+        if (sides.includes("C")) out.add("AMC");
+      } else if (group === "ST" && sides.includes("C")) {
+        out.add("ST");
+      }
+    }
+  }
   ["GK", "DL", "DR", "DC", "WBL", "WBR", "DM", "MC", "AMC", "AML", "AMR", "ST"].forEach((value) => { if (text.includes(value)) out.add(value); });
   return out;
 }
@@ -161,7 +206,16 @@ function positionScore(player: NormalizedPlayer, config: RoleConfig, slot?: Slot
   const primaryWanted = wantedPositions.some((position) => primaryPositions.has(position));
   const centralMidfieldHybrid = positions.has("MC");
   let score = wanted ? 100 : 0;
-  let familiarity = wanted ? "Natural" : "NotSuitable";
+  let familiarity: PositionFamiliarity = wanted ? "Natural" : "NotSuitable";
+  if (config.id === "fb-at" && wanted) {
+    const sideWingBack = wingBackPositions.some((position) => positions.has(position));
+    const sideMidfield = slot === "RB" ? positions.has("MR") : positions.has("ML");
+    const centralHybrid = positions.has("DM") || positions.has("MC") || positions.has("DC");
+    if (!sideWingBack && !sideMidfield && centralHybrid) {
+      score = 88;
+      familiarity = "Competent";
+    }
+  }
   if (config.id === "bpd-de" && wanted && (!primaryWanted || centralMidfieldHybrid)) {
     score = 72;
     familiarity = "Competent";
@@ -301,6 +355,7 @@ function dataEvidenceScore(player: NormalizedPlayer, config: RoleConfig, adjuste
 function applyCaps(player: NormalizedPlayer, config: RoleConfig, roleScore: number, familiarity: string) {
   let score = roleScore;
   const caps: string[] = [];
+  const familiarityRank: Record<PositionFamiliarity, number> = { NotSuitable: 0, PlausibleConversion: 1, Untrained: 2, Competent: 3, Accomplished: 4, Natural: 5 };
   for (const cap of config.scoreCaps ?? []) {
     let triggered = false;
     if (cap.attribute) {
@@ -308,7 +363,7 @@ function applyCaps(player: NormalizedPlayer, config: RoleConfig, roleScore: numb
       triggered = value !== undefined && value < Number(cap.lt);
     }
     if (cap.all) triggered = cap.all.every((item) => (attr(player, item.attribute) ?? 0) < item.lt);
-    if (cap.positionNotAtLeast) triggered = !["Natural", "Accomplished", "Competent"].includes(familiarity);
+    if (cap.positionNotAtLeast) triggered = (familiarityRank[familiarity as PositionFamiliarity] ?? 0) < familiarityRank[cap.positionNotAtLeast];
     if (cap.noCentralForwardSuitability) {
       const positions = parsedPositions(player);
       triggered = !positions.has("ST") && !positions.has("AMC");
@@ -342,8 +397,9 @@ function applyAttributeCaps(player: NormalizedPlayer, config: RoleConfig, roleSc
 export function scorePlayer(player: NormalizedPlayer, roleId: RoleId, slot?: SlotId): RoleScore {
   const league = leagueCoefficient(player);
   const config = ROLE_CONFIG[roleId], attribute = attributeScore(player, config), stats = statsScore(player, config), hidden = hiddenScore(player), position = positionScore(player, config, slot);
-  const pureRole = applyAttributeCaps(player, config, attribute.score ?? 50);
-  const preCapRole = clamp((attribute.score ?? 50) * ROLE_SCORE_WEIGHTS.attribute + (position.part.score ?? 0) * ROLE_SCORE_WEIGHTS.positionFoot + (hidden.score ?? 50) * ROLE_SCORE_WEIGHTS.hidden + (stats.adjusted.score ?? 50) * ROLE_SCORE_WEIGHTS.stats);
+  const hasRoleAttributes = attribute.score !== undefined && attribute.available > 0;
+  const attributeOnlyRole = applyAttributeCaps(player, config, hasRoleAttributes ? attribute.score! : 0);
+  const preCapRole = hasRoleAttributes ? clamp((attribute.score ?? 0) * ROLE_SCORE_WEIGHTS.attribute + (position.part.score ?? 0) * ROLE_SCORE_WEIGHTS.positionFoot + (hidden.score ?? 50) * ROLE_SCORE_WEIGHTS.hidden + (stats.adjusted.score ?? 50) * ROLE_SCORE_WEIGHTS.stats) : 0;
   const positionValue = position.part.score ?? 0;
   const positionCaps: string[] = [];
   let positionCappedRole = preCapRole;
@@ -359,26 +415,27 @@ export function scorePlayer(player: NormalizedPlayer, roleId: RoleId, slot?: Slo
   }
   const capped = applyCaps(player, config, positionCappedRole, position.familiarity);
   capped.caps.unshift(...positionCaps);
-  const valueContext = valueContextScore(player, config, pureRole.score), dataContext = dataEvidenceScore(player, config, stats.adjusted), metaContext = metaScore(player, config);
+  const valueContext = valueContextScore(player, config, capped.score), dataContext = dataEvidenceScore(player, config, stats.adjusted), metaContext = metaScore(player, config);
   const value = valueContext.market, wage = valueContext.wage, age = valueContext.age;
-  const recommendation = clamp(pureRole.score * RECOMMENDATION_SCORE_WEIGHTS.role + (valueContext.part.score ?? 50) * RECOMMENDATION_SCORE_WEIGHTS.value + (dataContext.part.score ?? 50) * RECOMMENDATION_SCORE_WEIGHTS.data);
-  const metaRecommendation = clamp(pureRole.score * META_RECOMMENDATION_SCORE_WEIGHTS.role + (valueContext.part.score ?? 50) * META_RECOMMENDATION_SCORE_WEIGHTS.value + (dataContext.part.score ?? 50) * META_RECOMMENDATION_SCORE_WEIGHTS.data + (metaContext.part.score ?? 50) * META_RECOMMENDATION_SCORE_WEIGHTS.meta);
+  const recommendation = clamp(capped.score * RECOMMENDATION_SCORE_WEIGHTS.role + (valueContext.part.score ?? 50) * RECOMMENDATION_SCORE_WEIGHTS.value + (dataContext.part.score ?? 50) * RECOMMENDATION_SCORE_WEIGHTS.data);
+  const metaRecommendation = clamp(capped.score * META_RECOMMENDATION_SCORE_WEIGHTS.role + (valueContext.part.score ?? 50) * META_RECOMMENDATION_SCORE_WEIGHTS.value + (dataContext.part.score ?? 50) * META_RECOMMENDATION_SCORE_WEIGHTS.data + (metaContext.part.score ?? 50) * META_RECOMMENDATION_SCORE_WEIGHTS.meta);
   const recruitment = clamp(capped.score * RECRUITMENT_SCORE_WEIGHTS.role + (value.score ?? 50) * RECRUITMENT_SCORE_WEIGHTS.marketValue + (wage.score ?? 50) * RECRUITMENT_SCORE_WEIGHTS.wage + (age.score ?? 50) * RECRUITMENT_SCORE_WEIGHTS.ageDevelopment);
   const confidence = dataContext.part.score ?? 50;
-  const prospect = clamp(pureRole.score * 0.55 + (age.score ?? 50) * 0.25 + (value.score ?? 50) * 0.15 + (wage.score ?? 50) * 0.05);
-  const currentForm = clamp(pureRole.score * 0.65 + (stats.adjusted.score ?? 50) * 0.25 + confidence * 0.1);
+  const prospect = clamp(capped.score * 0.55 + (age.score ?? 50) * 0.25 + (value.score ?? 50) * 0.15 + (wage.score ?? 50) * 0.05);
+  const currentForm = clamp(capped.score * 0.65 + (stats.adjusted.score ?? 50) * 0.25 + confidence * 0.1);
   const warnings = config.warnings.filter((warning) => {
     const value = attr(player, warning.attribute);
     return value !== undefined && value < warning.lt;
   }).map((warning) => warning.label);
   if (Number(player.minutes ?? 0) < 300) warnings.push("Under 300 mins: low sample");
+  if (!hasRoleAttributes) warnings.push("Missing role attributes: Role Score cannot be calculated");
   if (!stats.adjusted.available) warnings.push("Missing performance stats");
   if (!hidden.available) warnings.push("Missing hidden/profile data");
   if (player.transferValueStatus === "not_for_sale") warnings.push("Not for sale: value is unavailable, not zero");
   const keyAttributes = Object.entries(config.attributeWeights).map(([key, weight]) => ({ key, value: attr(player, key), weight })).filter((item): item is { key: string; value: number; weight: number } => item.value !== undefined).sort((a, b) => (b.value * b.weight) - (a.value * a.weight));
-  const allCaps = [...pureRole.caps, ...capped.caps];
+  const allCaps = [...attributeOnlyRole.caps, ...capped.caps];
   return {
-    roleId, slot, roleScore: Number(pureRole.score.toFixed(1)), legacyRoleScore: Number(capped.score.toFixed(1)), valueScore: Number((valueContext.part.score ?? 50).toFixed(1)), dataScore: Number((dataContext.part.score ?? 50).toFixed(1)), metaScore: Number((metaContext.part.score ?? 50).toFixed(1)), recommendationScore: Number(recommendation.toFixed(1)), metaRecommendationScore: Number(metaRecommendation.toFixed(1)), recruitmentScore: Number(recruitment.toFixed(1)), confidenceScore: Number(confidence.toFixed(1)), prospectScore: Number(prospect.toFixed(1)), currentFormScore: Number(currentForm.toFixed(1)),
+    roleId, slot, roleScore: Number(capped.score.toFixed(1)), legacyRoleScore: Number(attributeOnlyRole.score.toFixed(1)), valueScore: Number((valueContext.part.score ?? 50).toFixed(1)), dataScore: Number((dataContext.part.score ?? 50).toFixed(1)), metaScore: Number((metaContext.part.score ?? 0).toFixed(1)), recommendationScore: Number(recommendation.toFixed(1)), metaRecommendationScore: Number(metaRecommendation.toFixed(1)), recruitmentScore: Number(recruitment.toFixed(1)), confidenceScore: Number(confidence.toFixed(1)), prospectScore: Number(prospect.toFixed(1)), currentFormScore: Number(currentForm.toFixed(1)),
     attribute, stats: stats.adjusted, rawStats: Number(stats.raw.toFixed(1)), hidden, position: position.part, value: valueContext.part, wage, ageDevelopment: age, data: dataContext.part, meta: metaContext.part, caps: allCaps,
     strengths: keyAttributes.slice(0, 4).map((item) => `${item.key} ${item.value}`),
     weaknesses: keyAttributes.slice(-4).filter((item) => item.value < 12).map((item) => `${item.key} ${item.value}`),
@@ -387,7 +444,7 @@ export function scorePlayer(player: NormalizedPlayer, roleId: RoleId, slot?: Slo
     dataNotes: dataContext.notes,
     metaNotes: metaContext.notes,
     warnings: [...new Set(warnings)],
-    explanation: [`Role Score is pure weighted FM attributes for the selected role.`, `Legacy blended role fit would be ${capped.score.toFixed(1)} after position, hidden/profile and adjusted stats.`, `Recommendation Score blends Role ${Math.round(RECOMMENDATION_SCORE_WEIGHTS.role * 100)}%, Value ${Math.round(RECOMMENDATION_SCORE_WEIGHTS.value * 100)}%, Data ${Math.round(RECOMMENDATION_SCORE_WEIGHTS.data * 100)}%.`, `Meta Rec blends Role ${Math.round(META_RECOMMENDATION_SCORE_WEIGHTS.role * 100)}%, Value ${Math.round(META_RECOMMENDATION_SCORE_WEIGHTS.value * 100)}%, Data ${Math.round(META_RECOMMENDATION_SCORE_WEIGHTS.data * 100)}%, Meta ${Math.round(META_RECOMMENDATION_SCORE_WEIGHTS.meta * 100)}%.`, `Performance stats use ${league.label} coefficient ${league.coefficient.toFixed(2)} before minutes shrinkage.`, `Stats shrink from ${stats.raw.toFixed(1)} to ${(stats.adjusted.score ?? 50).toFixed(1)} using minutes confidence ${minutesConfidence(Number(player.minutes ?? 0)).toFixed(2)}.`],
+    explanation: [`Role Score blends attributes ${Math.round(ROLE_SCORE_WEIGHTS.attribute * 100)}%, position/foot ${Math.round(ROLE_SCORE_WEIGHTS.positionFoot * 100)}%, hidden/profile ${Math.round(ROLE_SCORE_WEIGHTS.hidden * 100)}% and adjusted stats ${Math.round(ROLE_SCORE_WEIGHTS.stats * 100)}%.`, `Attribute-only role fit is ${attributeOnlyRole.score.toFixed(1)} before position, hidden/profile and adjusted stats.`, `Recommendation Score blends Role ${Math.round(RECOMMENDATION_SCORE_WEIGHTS.role * 100)}%, Value ${Math.round(RECOMMENDATION_SCORE_WEIGHTS.value * 100)}%, Data ${Math.round(RECOMMENDATION_SCORE_WEIGHTS.data * 100)}%.`, `Meta Rec blends Role ${Math.round(META_RECOMMENDATION_SCORE_WEIGHTS.role * 100)}%, Value ${Math.round(META_RECOMMENDATION_SCORE_WEIGHTS.value * 100)}%, Data ${Math.round(META_RECOMMENDATION_SCORE_WEIGHTS.data * 100)}%, Meta ${Math.round(META_RECOMMENDATION_SCORE_WEIGHTS.meta * 100)}%.`, `Performance stats use ${league.label} coefficient ${league.coefficient.toFixed(2)} before minutes shrinkage.`, `Stats shrink from ${stats.raw.toFixed(1)} to ${(stats.adjusted.score ?? 50).toFixed(1)} using minutes confidence ${minutesConfidence(Number(player.minutes ?? 0)).toFixed(2)}.`],
   };
 }
 

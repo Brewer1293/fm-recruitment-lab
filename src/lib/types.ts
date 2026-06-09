@@ -36,7 +36,8 @@ export type NormalizedPlayer = Record<string, string | number | RawPlayer | unde
 
 export type WeightedMetric = { key: string; weight: number; label?: string; inverse?: boolean };
 export type FloorPenalty = { attribute: string; lt: number; minus: number };
-export type ScoreCap = { attribute?: string; lt?: number; all?: { attribute: string; lt: number }[]; positionNotAtLeast?: "Competent"; noCentralForwardSuitability?: boolean; maxRoleScore: number };
+export type PositionFamiliarity = "Natural" | "Accomplished" | "Competent" | "Untrained" | "PlausibleConversion" | "NotSuitable";
+export type ScoreCap = { attribute?: string; lt?: number; all?: { attribute: string; lt: number }[]; positionNotAtLeast?: PositionFamiliarity; noCentralForwardSuitability?: boolean; maxRoleScore: number };
 export type WarningThreshold = { attribute: string; lt: number; label: string };
 export type RoleConfig = {
   id: RoleId;
